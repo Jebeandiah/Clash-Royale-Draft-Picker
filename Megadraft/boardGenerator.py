@@ -81,7 +81,11 @@ class Board:
 
         return picked_cards
 
+    """
+    Returns a list containing 36 cards
+    """
     def _generate_board(self):
+        # Picks cards based on the correct ratios 
         tanks = Board._pick_cards(self, "tank", 4)
         anti_air = Board._pick_cards(self, "anti_air", 4)
         distraction = Board._pick_cards(self, "distraction", 4)
@@ -102,18 +106,23 @@ class Board:
         self.board = self._generate_board()
 
     def reset(self):
+        # Same as __init__
         self.cards = copy.deepcopy(cards)
         self.available_cards = copy.deepcopy(all_cards)
         self.board = self._generate_board()
 
 
+    """
+    Printing a `Board()` prints the cards
+    inside self.cards formatted in a table
+    """
     def __str__(self):
         card_count = 0
         tab_count = 1
         print_string = ""
         for card in self.board:
             card_count += 1
-            tab_count = 3 - (len(card) // 8)
+            tab_count =  3- (len(card) // 8)
             print_string += card + (tab_count * "\t")
             if card_count % 6 == 0:
                 print_string += "\n"

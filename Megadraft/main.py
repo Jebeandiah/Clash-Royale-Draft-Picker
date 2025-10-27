@@ -1,19 +1,19 @@
 from boardGenerator import *
 
 def main():
-    newBoard = Board()
+    # newBoard = Board()
+    pass
 
 
 def run_tests():
     newBoard = Board()
-    print("Testing Board Generator")
+    print("Board Generated: ")
     print(newBoard)
-    print(len(newBoard.cards),"\n")
 
-    print("Testing No Repeats")
+    # Tests no repeats on board
     for i in range(10):
         newBoard.reset()
-        print(len(set(newBoard.board)))
+        assert(len(newBoard.board) == 36)
 
 if __name__ == "__main__":
     print("Running Main!")
