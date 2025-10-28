@@ -1,3 +1,8 @@
+"""
+File Contains the Board class
+
+Last Edited: 10/27/2025
+"""
 import random
 import copy
 

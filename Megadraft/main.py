@@ -13,6 +13,8 @@ print("Checking Dependencies... ")
 try:
     # maybe from boardGenerator import * is better
     from boardGenerator import Board
+    from boardGenerator import cards
+    from boardGenerator import all_cards
     print("\tImported Files Successfully!")
 except:
     print("\tUnable to import files")
@@ -40,6 +42,7 @@ def main():
     pass
 
 def run_tests():
+    print("Number of Cards Total: ", len(all_cards))
     newBoard = Board()
     print("Board Generated: ")
     print(newBoard)
@@ -52,5 +55,5 @@ def run_tests():
 if __name__ == "__main__":
     print("Running Main!")
     main()
-    # print("Running Tests!")
-    # run_tests()
+    print("Running Tests!")
+    run_tests()
