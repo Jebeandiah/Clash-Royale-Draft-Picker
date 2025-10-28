@@ -65,9 +65,9 @@ def extract_battle_data(battle, player_tag):
     return {
         "player_tag": player_tag,
         "player_name": team["name"],
-        "player_deck": ", ".join([c["name"] for c in team.get("deck", [])]),
+        "player_deck": ", ".join([c["name"] for c in team.get("cards", [])]),
         "opponent_name": opp["name"],
-        "opponent_deck": ", ".join([c["name"] for c in opp.get("deck", [])]),
+        "opponent_deck": ", ".join([c["name"] for c in opp.get("cards", [])]),
         "player_won": int(team["crowns"] > opp["crowns"]),
         "player_crowns": team["crowns"],
         "opponent_crowns": opp["crowns"],
