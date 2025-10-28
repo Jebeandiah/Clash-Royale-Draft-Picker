@@ -125,7 +125,7 @@ class Board:
                 print_string += "\n"
 
         return print_string
-    
+
 
 
 
