@@ -4,7 +4,7 @@ import time
 import random
 from urllib.parse import quote
 
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjMzYTkyMTA2LWFmNDAtNDc5Ny1iZDJkLTU3YjI3Y2RlMjUxYiIsImlhdCI6MTc2MTYxNDkxNCwic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjI0OC4xNSJdLCJ0eXBlIjoiY2xpZW50In1dfQ.BopZbO5vTvq6oXEXWRTJY3SpU9LCAlrszKH20uv-ynGZbWGABKFsoZiRD1VJbBjEmd8GayGs1wBAtVog6C-vSA"
+API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6Ijg1MjVhZDQyLTgzMmEtNDMxNS04NDJhLWNjZDMxZTNmOTFlOCIsImlhdCI6MTc2MTY4NDAxNywic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjU2LjIyNyIsIjEzNC4xNzMuMTkyLjc2Il0sInR5cGUiOiJjbGllbnQifV19.v-biGRJboJybMK0XE7Vn8vv8zVV4o5RCNfjrhUiLUuhMrN4wwofPHf-xYzaY_F-h8t41s9lLQvEkBichWY_FvA"
 HEADERS = {
     "Accept": "application/json",
     "Authorization": f"Bearer {API_TOKEN}"
@@ -66,8 +66,12 @@ def extract_battle_data(battle, player_tag):
         # "player_tag": player_tag,
         # "player_name": team["name"],
         "player_deck": ", ".join([c["name"] for c in team.get("cards", [])]),
+        # "pool": ", ".join([c["name"] for c in team.get("supportCards", [])]),
+
         # "opponent_name": opp["name"],
         "opponent_deck": ", ".join([c["name"] for c in opp.get("cards", [])]),
+        # "testpool": ", ".join([c["name"] for c in opp.get("supportCards", [])]),
+
         "player_won": int(team["crowns"] > opp["crowns"]),
         "player_crowns": team["crowns"],
         "opponent_crowns": opp["crowns"],
@@ -95,8 +99,8 @@ def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft_match
 
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
-            "player_tag", "player_name", "player_deck", "opponent_name", "opponent_deck",
-            "player_won", "player_crowns", "opponent_crowns", "battle_time", "arena", "mode"
+            "player_won", "player_crowns", "opponent_crowns","player_deck", "opponent_deck"
+            
         ])
         writer.writeheader()
 
@@ -129,6 +133,6 @@ if __name__ == "__main__":
     # for b in battles:
     #     print(b.get("deckSelection", "").upper() )
        
-    # Random small delay to stay below rate limits
+    # #Random small delay to stay below rate limits
     # time.sleep(random.uniform(0.5, 1.2))
     collect_megadraft_from_top_clans(top_n_clans=10)
