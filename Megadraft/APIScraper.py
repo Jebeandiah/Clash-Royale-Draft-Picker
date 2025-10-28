@@ -4,7 +4,7 @@ import time
 import random
 from urllib.parse import quote
 
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjExNzkyNDBiLTlkNDctNDg1ZS1iYzVmLWYwYmNhMzI2MjY3YiIsImlhdCI6MTc2MTYwNjc3Mywic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjE5Mi43NiJdLCJ0eXBlIjoiY2xpZW50In1dfQ.MNuqgzgCAUy_sZy4ccrKLcfdqD4WteOqY9OnCX-i7dkaiXAV4bcOediK3eU19OADbfm8K0US0oTOHfnWHv9I1A"
+API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjMzYTkyMTA2LWFmNDAtNDc5Ny1iZDJkLTU3YjI3Y2RlMjUxYiIsImlhdCI6MTc2MTYxNDkxNCwic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjI0OC4xNSJdLCJ0eXBlIjoiY2xpZW50In1dfQ.BopZbO5vTvq6oXEXWRTJY3SpU9LCAlrszKH20uv-ynGZbWGABKFsoZiRD1VJbBjEmd8GayGs1wBAtVog6C-vSA"
 HEADERS = {
     "Accept": "application/json",
     "Authorization": f"Bearer {API_TOKEN}"
@@ -63,17 +63,17 @@ def extract_battle_data(battle, player_tag):
     team = battle["team"][0]
     opp = battle["opponent"][0]
     return {
-        "player_tag": player_tag,
-        "player_name": team["name"],
+        # "player_tag": player_tag,
+        # "player_name": team["name"],
         "player_deck": ", ".join([c["name"] for c in team.get("cards", [])]),
-        "opponent_name": opp["name"],
+        # "opponent_name": opp["name"],
         "opponent_deck": ", ".join([c["name"] for c in opp.get("cards", [])]),
         "player_won": int(team["crowns"] > opp["crowns"]),
         "player_crowns": team["crowns"],
         "opponent_crowns": opp["crowns"],
-        "battle_time": battle.get("battleTime", ""),
-        "arena": battle.get("arena", {}).get("name", ""),
-        "mode": battle.get("type", "")
+        # "battle_time": battle.get("battleTime", ""),
+        # "arena": battle.get("arena", {}).get("name", ""),
+        # "mode": battle.get("type", "")
     }
 
 # --- MAIN LOOP ---
