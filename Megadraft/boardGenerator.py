@@ -46,7 +46,6 @@ cards = {
                   "rascals", "cannon cart", "elite barbarians", "sparky", "pekka"],
     "champion": ["little prince", "skeleton king", "golden knight", "mighty miner",
                  "archer queen", "monk", "goblinstein", "boss bandit"], 
-                #  monk, goblinstein, and boss bandit might not be in megadraft?
     "building": ["tombstone", "cannon", "goblin hut", "goblin cage", "bomb tower", "mortar",
                  "tesla", "furnace", "inferno tower", "barbarian hut", "xbow",
                  "elixir collector"]
@@ -63,9 +62,19 @@ all_cards = set().union(*cards.values())
 Class that contains all the cards on a randomized megadraft board
 """
 class Board:
+    def __init__(self):
+        self.cards = copy.deepcopy(cards)
+        self.available_cards = copy.deepcopy(all_cards)
+        self.board = self._generate_board()
+
+    def reset(self):
+        # Same as __init__
+        self.cards = copy.deepcopy(cards)
+        self.available_cards = copy.deepcopy(all_cards)
+        self.board = self._generate_board()
 
     """
-    Static helper function that chooses a card numTimes from 
+    Helper function that chooses a card numTimes from 
     the available pool given the passed cardType. Updates
     pool as needed to account for no repeats
     """
@@ -99,18 +108,6 @@ class Board:
 
         return tanks + anti_air + distraction + damage_spell + win_condition + \
             second_spell + mini_tank + anti_tank + champion + building
-        
-    def __init__(self):
-        self.cards = copy.deepcopy(cards)
-        self.available_cards = copy.deepcopy(all_cards)
-        self.board = self._generate_board()
-
-    def reset(self):
-        # Same as __init__
-        self.cards = copy.deepcopy(cards)
-        self.available_cards = copy.deepcopy(all_cards)
-        self.board = self._generate_board()
-
 
     """
     Printing a `Board()` prints the cards
