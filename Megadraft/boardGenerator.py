@@ -55,6 +55,9 @@ cards = {
 Flattened version of cards, so just a set of all cards
 """
 all_cards = set().union(*cards.values())
+card_list = list(all_cards)
+def card_str_to_id(cardname):
+    return card_list.index(cardname.lower())
 
 #####################################################################
 
