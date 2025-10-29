@@ -1,17 +1,38 @@
 import asyncio
 import aiohttp
 import csv
-import random
 import time
 import boardGenerator as bg
 from urllib.parse import quote
 import sqlite3
 
 def reset_db(dbname):
+    """Completely clear and recreate the battles table."""
     con = sqlite3.connect(f'{dbname}.db')
-    con.execute('VACUUM')
     cursor = con.cursor()
-    cursor.execute("""CREATE TABLE battles """)
+    
+    # Drop the old table if it exists
+    cursor.execute("DROP TABLE IF EXISTS battles")
+    
+    # Create the new table
+    cursor.execute('''
+        CREATE TABLE battles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_crowns INTEGER NOT NULL,
+            opp_crowns INTEGER NOT NULL,
+            winner_low_tower INTEGER NOT NULL,
+            player_deck TEXT NOT NULL,
+            opp_deck TEXT NOT NULL
+        )
+    ''')
+    
+    con.commit()
+    
+    # Optional: shrink the database file to reclaim space
+    con.execute("VACUUM")
+    
+    con.close()
+    print(f"✅ Database '{dbname}.db' has been reset and cleared.")
 
 
 API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6Ijg1MjVhZDQyLTgzMmEtNDMxNS04NDJhLWNjZDMxZTNmOTFlOCIsImlhdCI6MTc2MTY4NDAxNywic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjU2LjIyNyIsIjEzNC4xNzMuMTkyLjc2Il0sInR5cGUiOiJjbGllbnQifV19.v-biGRJboJybMK0XE7Vn8vv8zVV4o5RCNfjrhUiLUuhMrN4wwofPHf-xYzaY_F-h8t41s9lLQvEkBichWY_FvA"
@@ -23,18 +44,18 @@ HEADERS = {
 
 # --- CONFIGURABLE LIMITS ---
 MAX_CONCURRENT_REQUESTS = 9    # max simultaneous requests
-REQUESTS_PER_SECOND = 200       # max requests per second
+REQUESTS_PER_SECOND = 120       # max requests per second
 
 # --- ASYNC HELPERS ---
 
-async def safe_get(session, url, retries=3, timeout=5):
+async def safe_get(session, url, retries=3, timeout=500):
     """GET request with retry on failure or 429"""
     for attempt in range(retries):
         try:
             async with session.get(url, headers=HEADERS, timeout=timeout) as resp:
                 if resp.status == 429:
                     # wait a bit and retry
-                    wait = 3000
+                    wait = 0.5
                     print(f"⚠️ Rate limited, waiting {wait}s...")
                     await asyncio.sleep(wait)
                     continue
@@ -68,17 +89,35 @@ async def fetch_battlelog(session, player_tag):
 def is_mega_draft(battle):
     return battle.get("deckSelection", "").upper() == "PICK"
 
-def extract_battle_data(battle, player_tag):
+def extract_battle_data(battle):
     team = battle["team"][0]
     opp = battle["opponent"][0]
-    return {
-        "player_deck": ", ".join([str(bg.card_str_to_id(c["name"])) for c in team.get("cards", [])]),
-        "opponent_deck": ", ".join([str(bg.card_str_to_id(c["name"])) for c in opp.get("cards", [])]),
-        "player_won": int(team["crowns"] > opp["crowns"]),
-        "player_crowns": team["crowns"],
-        "opponent_crowns": opp["crowns"]
-    }
 
+    tdeck = [bg.card_str_to_id(c["name"]) for c in team.get("cards", [])]
+    odeck = [bg.card_str_to_id(c["name"]) for c in opp.get("cards", [])]
+
+    winner = team if team["crowns"] > opp["crowns"] else opp
+    wtower_healths = (winner.get("princessTowersHitPoints") or []) + [winner.get("kingTowerHitPoints", 0)]   
+     # print([winner["kingTowerHitPoints"]])
+    # print(wtower_healths)
+    wlowtowerhealth =0
+    for i in range(abs(team["crowns"] - opp["crowns"])):
+        wlowtowerhealth+=min(wtower_healths)
+        wtower_healths.remove(min(wtower_healths))
+    #wlowtowhealth = min([hp for hp in wtower_healths if hp != 0], default=0)
+
+    return (team["crowns"], opp["crowns"], wlowtowerhealth, str(tdeck), str(odeck))
+
+# def write_battle_data(battle, player_tag, db):
+#     team = battle["team"][0]
+#     opp = battle["opponent"][0]
+#     return {
+#         "player_deck": ", ".join([c["name"] for c in team.get("cards", [])]),
+#         "opponent_deck": ", ".join([c["name"] for c in opp.get("cards", [])]),
+#         "player_won": int(team["crowns"] > opp["crowns"]),
+#         "player_crowns": team["crowns"],
+#         "opponent_crowns": opp["crowns"]
+#     }
 # --- RATE-LIMITER HELPERS ---
 
 class RateLimiter:
@@ -98,10 +137,11 @@ class RateLimiter:
 
 # --- MAIN SCRAPER ---
 
-async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft_matches.csv"):
+async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft_matches.csv", dbname="testdb"):
     rate_limiter = RateLimiter(REQUESTS_PER_SECOND)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
-
+    con = sqlite3.connect(f'{dbname}.db')
+    cur = con.cursor()
     async with aiohttp.ClientSession() as session:
         clans = await fetch_top_clans(session, top_n_clans)
         if not clans:
@@ -118,30 +158,77 @@ async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft
 
         print(f"✅ Got {len(all_players)} players from {len(clans)} clans.")
 
-        with open(output_csv, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=[
-                "player_won", "player_crowns", "opponent_crowns","player_deck", "opponent_deck"
-            ])
-            writer.writeheader()
+        
 
-            async def fetch_player(player_tag, idx):
-                async with semaphore:
-                    await rate_limiter.wait()
-                    battles = await fetch_battlelog(session, player_tag)
-                    count = 0
-                    for b in battles:
-                        if is_mega_draft(b):
-                            row = extract_battle_data(b, player_tag)
-                            writer.writerow(row)
-                            count += 1
-                    print(f"🔹 [{idx+1}/{len(all_players)}] {player_tag}: {count} Mega Draft matches")
-                    await asyncio.sleep(random.uniform(0.05, 0.15))
+        async def fetch_player(player_tag, idx):
+            async with semaphore:
+                await rate_limiter.wait()
+                battles = await fetch_battlelog(session, player_tag)
+                count = 0
+                for b in battles:
+                    if is_mega_draft(b):
+                        row = extract_battle_data(b)
+                        cur.execute("""
+                            INSERT OR IGNORE INTO battles 
+                            (player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, row)
+                        con.commit()
+                        # writer.writerow(row)
+                        count += 1
+                print(f"🔹 [{idx+1}/{len(all_players)}] {player_tag}: {count} Mega Draft matches")
+                # await asyncio.sleep(random.uniform(0.05, 0.15))
 
-            tasks = [fetch_player(tag, i) for i, tag in enumerate(all_players)]
-            await asyncio.gather(*tasks)
+        tasks = [fetch_player(tag, i) for i, tag in enumerate(all_players)]
+        await asyncio.gather(*tasks)
 
     print(f"\n✅ Done! Mega Draft data saved to {output_csv}")
+import ast  # for safely converting string representation of lists back to Python lists
+
+def read_battles(dbname="testdb", limit=None):
+    """
+    Reads battles from the database.
+    
+    Returns a list of dictionaries:
+        {
+            'id': int,
+            'player_crowns': int,
+            'opp_crowns': int,
+            'winner_low_tower': int,
+            'player_deck': list of ints,
+            'opp_deck': list of ints
+        }
+    """
+    con = sqlite3.connect(f"{dbname}.db")
+    cursor = con.cursor()
+
+    query = "SELECT * FROM battles"
+    if limit:
+        query += f" LIMIT {limit}"
+    
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    con.close()
+
+    battles = []
+    for row in rows:
+        # row: (id, player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
+        battle = {
+            "id": row[0],
+            "player_crowns": row[1],
+            "opp_crowns": row[2],
+            "winner_low_tower": row[3],
+            "player_deck": ast.literal_eval(row[4]),  # convert string back to list
+            "opp_deck": ast.literal_eval(row[5])
+        }
+        battles.append(battle)
+    
+    return battles
 
 # --- RUN ---
 if __name__ == "__main__":
-    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=100))
+    battles = read_battles("testdb", limit=10)
+    for b in battles:
+        print(b["player_deck"], b["opp_deck"], b["player_crowns"], b["opp_crowns"], b["winner_low_tower"])
+    # reset_db("testdb")
+    # asyncio.run(collect_megadraft_from_top_clans(top_n_clans=50))
