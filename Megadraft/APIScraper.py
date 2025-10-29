@@ -3,6 +3,7 @@ import aiohttp
 import csv
 import random
 import time
+import boardGenerator as bg
 from urllib.parse import quote
 import sqlite3
 
@@ -71,8 +72,8 @@ def extract_battle_data(battle, player_tag):
     team = battle["team"][0]
     opp = battle["opponent"][0]
     return {
-        "player_deck": ", ".join([c["name"] for c in team.get("cards", [])]),
-        "opponent_deck": ", ".join([c["name"] for c in opp.get("cards", [])]),
+        "player_deck": ", ".join([str(bg.card_str_to_id(c["name"])) for c in team.get("cards", [])]),
+        "opponent_deck": ", ".join([str(bg.card_str_to_id(c["name"])) for c in opp.get("cards", [])]),
         "player_won": int(team["crowns"] > opp["crowns"]),
         "player_crowns": team["crowns"],
         "opponent_crowns": opp["crowns"]
