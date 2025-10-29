@@ -1,38 +1,11 @@
 import asyncio
 import aiohttp
-import csv
 import time
 import boardGenerator as bg
 from urllib.parse import quote
 import sqlite3
+import dBManager
 
-def reset_db(dbname):
-    """Completely clear and recreate the battles table."""
-    con = sqlite3.connect(f'{dbname}.db')
-    cursor = con.cursor()
-    
-    # Drop the old table if it exists
-    cursor.execute("DROP TABLE IF EXISTS battles")
-    
-    # Create the new table
-    cursor.execute('''
-        CREATE TABLE battles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            player_crowns INTEGER NOT NULL,
-            opp_crowns INTEGER NOT NULL,
-            winner_low_tower INTEGER NOT NULL,
-            player_deck TEXT NOT NULL,
-            opp_deck TEXT NOT NULL
-        )
-    ''')
-    
-    con.commit()
-    
-    # Optional: shrink the database file to reclaim space
-    con.execute("VACUUM")
-    
-    con.close()
-    print(f"✅ Database '{dbname}.db' has been reset and cleared.")
 
 
 API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6Ijg1MjVhZDQyLTgzMmEtNDMxNS04NDJhLWNjZDMxZTNmOTFlOCIsImlhdCI6MTc2MTY4NDAxNywic3ViIjoiZGV2ZWxvcGVyL2VhY2E4OWQzLWUyYjYtZDU2NC1iNTQ2LWMxMzY4NTZkNzA5OCIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMzQuMTczLjU2LjIyNyIsIjEzNC4xNzMuMTkyLjc2Il0sInR5cGUiOiJjbGllbnQifV19.v-biGRJboJybMK0XE7Vn8vv8zVV4o5RCNfjrhUiLUuhMrN4wwofPHf-xYzaY_F-h8t41s9lLQvEkBichWY_FvA"
@@ -105,8 +78,9 @@ def extract_battle_data(battle):
         wlowtowerhealth+=min(wtower_healths)
         wtower_healths.remove(min(wtower_healths))
     #wlowtowhealth = min([hp for hp in wtower_healths if hp != 0], default=0)
-
-    return (team["crowns"], opp["crowns"], wlowtowerhealth, str(tdeck), str(odeck))
+    battle_id = f"{team["tag"]}_{battle["battleTime"]}"
+    # print(battle_id)
+    return (battle_id, team["crowns"], opp["crowns"], wlowtowerhealth, str(tdeck), str(odeck))
 
 # def write_battle_data(battle, player_tag, db):
 #     team = battle["team"][0]
@@ -137,7 +111,7 @@ class RateLimiter:
 
 # --- MAIN SCRAPER ---
 
-async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft_matches.csv", dbname="testdb"):
+async def collect_megadraft_from_top_clans(top_n_clans=5, dbname=dBManager.dbname):
     rate_limiter = RateLimiter(REQUESTS_PER_SECOND)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     con = sqlite3.connect(f'{dbname}.db')
@@ -170,8 +144,8 @@ async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft
                         row = extract_battle_data(b)
                         cur.execute("""
                             INSERT OR IGNORE INTO battles 
-                            (player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
-                            VALUES (?, ?, ?, ?, ?)
+                            (battle_id, player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
+                            VALUES (?,?, ?, ?, ?, ?)
                         """, row)
                         con.commit()
                         # writer.writerow(row)
@@ -182,53 +156,13 @@ async def collect_megadraft_from_top_clans(top_n_clans=5, output_csv="mega_draft
         tasks = [fetch_player(tag, i) for i, tag in enumerate(all_players)]
         await asyncio.gather(*tasks)
 
-    print(f"\n✅ Done! Mega Draft data saved to {output_csv}")
+ # print(f"\n✅ Done! Mega Draft data saved to {output_csv}")
 import ast  # for safely converting string representation of lists back to Python lists
 
-def read_battles(dbname="testdb", limit=None):
-    """
-    Reads battles from the database.
-    
-    Returns a list of dictionaries:
-        {
-            'id': int,
-            'player_crowns': int,
-            'opp_crowns': int,
-            'winner_low_tower': int,
-            'player_deck': list of ints,
-            'opp_deck': list of ints
-        }
-    """
-    con = sqlite3.connect(f"{dbname}.db")
-    cursor = con.cursor()
 
-    query = "SELECT * FROM battles"
-    if limit:
-        query += f" LIMIT {limit}"
-    
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    con.close()
-
-    battles = []
-    for row in rows:
-        # row: (id, player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
-        battle = {
-            "id": row[0],
-            "player_crowns": row[1],
-            "opp_crowns": row[2],
-            "winner_low_tower": row[3],
-            "player_deck": ast.literal_eval(row[4]),  # convert string back to list
-            "opp_deck": ast.literal_eval(row[5])
-        }
-        battles.append(battle)
-    
-    return battles
 
 # --- RUN ---
 if __name__ == "__main__":
-    battles = read_battles("testdb", limit=10)
-    for b in battles:
-        print(b["player_deck"], b["opp_deck"], b["player_crowns"], b["opp_crowns"], b["winner_low_tower"])
+
     # reset_db("testdb")
-    # asyncio.run(collect_megadraft_from_top_clans(top_n_clans=50))
+    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=50))
