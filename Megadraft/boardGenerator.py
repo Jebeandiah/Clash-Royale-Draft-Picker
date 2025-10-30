@@ -22,7 +22,7 @@ Some cards are in multiple classes:
 """
 cards = {
     "tank": ["ice golem", "knight", "miner", "elixir golem", "valkyrie", "rune giant",
-             "goblin drill", "giant", "rascals", "bowler", "goblin demolisher", "royal giant",
+             "goblin drill", "giant", "rascals", "bowler",  "royal giant",
              "giant skeleton", "goblin giant", "royal recruits", "mega knight", "electro giant",
              "lava hound", "golem", "goblin machine"],
     "anti_air": ["spear goblins", "bats", "archers", "minions", "mega minion", "dart goblin",

@@ -25,10 +25,10 @@ def format_db(dbname):
     
     # Create the new table
     cursor.execute('''
-        CREATE TABLE inputs (
+        CREATE TABLE training (
             cards BLOB NOT NULL,
             pick_step INTEGER NOT NULL,
-            score INTEGER NOT NULL,
+            score INTEGER NOT NULL
         )
     ''')
     con.commit()
@@ -38,6 +38,7 @@ def format_db(dbname):
     
     con.close()
     print(f"✅ Database '{dbname}.db' has been reset and cleared.")
+
 def read_battles(dbname=dbname, limit=None):
     """
     Reads battles from the database.
@@ -79,6 +80,6 @@ def read_battles(dbname=dbname, limit=None):
     return battles
 
 if __name__ == "__main__":
-    print(read_battles(dbname, 1)[0])
+    # print(read_battles(dbname, 1)[0])
     # format_db("testdb")
     pls = "stop"
