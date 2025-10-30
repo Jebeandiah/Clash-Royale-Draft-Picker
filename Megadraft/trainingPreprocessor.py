@@ -21,7 +21,10 @@ category_totals = {"tank": 4,
 
 def states_from_battle(battle, bcid, idtocat):
     category_counts = copy.deepcopy(category_totals)
-   
+    # print(battle["id"])
+    # print(bcid)
+    # print(idtocat)
+    # print(category_counts)
     def generate_draft_pool():
         pool = []
         categories_satisfied = True
@@ -36,16 +39,17 @@ def states_from_battle(battle, bcid, idtocat):
                 choice = random.choice(categories)
                 # print(categories)
                 current_choices+=[choice]     
+            # print(f"{bg.card_list[card]} {choice} {categories}")
             if category_counts[choice] ==0: categories_satisfied = False
             category_counts[choice]-=1
             for category in categories:
                 bcid[category].remove(card)
         textpool = []
-        for card in generate_draft_pool():
+        for card in pool:
             textpool+=[bg.card_list[card]]
-        print(textpool)
-        print(category_counts)
-        print(current_choices)
+        # print(textpool)
+        # print(category_counts)
+        # print(current_choices)
         if not categories_satisfied:
             for choice in current_choices:
                 category_counts[choice]+=1
@@ -55,7 +59,8 @@ def states_from_battle(battle, bcid, idtocat):
                 categories_satisfied = True
                 current_choices =[]
                 for choice in combo:
-                    print(category_counts[choice] )
+                    
+                    # print(category_counts[choice] )
                     if category_counts[choice] ==0:
                         categories_satisfied = False
                         break
@@ -84,7 +89,7 @@ def states_from_battle(battle, bcid, idtocat):
     textpool = []
     for card in generate_draft_pool():
         textpool+=[bg.card_list[card]]
-    # print(len(textpool))
+    print(len(textpool))
     return
 
 

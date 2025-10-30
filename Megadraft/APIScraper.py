@@ -68,7 +68,8 @@ def extract_battle_data(battle):
 
     tdeck = [bg.card_str_to_id(c["name"]) for c in team.get("cards", [])]
     odeck = [bg.card_str_to_id(c["name"]) for c in opp.get("cards", [])]
-
+    # print(team.get("cards", []))
+    # print(opp.get("cards", []))
     winner = team if team["crowns"] > opp["crowns"] else opp
     wtower_healths = (winner.get("princessTowersHitPoints") or []) + [winner.get("kingTowerHitPoints", 0)]   
      # print([winner["kingTowerHitPoints"]])
@@ -80,6 +81,7 @@ def extract_battle_data(battle):
     #wlowtowhealth = min([hp for hp in wtower_healths if hp != 0], default=0)
     battle_id = f"{team["tag"]}_{battle["battleTime"]}"
     # print(battle_id)
+
     return (battle_id, team["crowns"], opp["crowns"], wlowtowerhealth, str(tdeck), str(odeck))
 
 # def write_battle_data(battle, player_tag, db):
@@ -148,6 +150,7 @@ async def collect_megadraft_from_top_clans(top_n_clans=5, dbname=dBManager.dbnam
                             VALUES (?,?, ?, ?, ?, ?)
                         """, row)
                         con.commit()
+
                         # writer.writerow(row)
                         count += 1
                 print(f"🔹 [{idx+1}/{len(all_players)}] {player_tag}: {count} Mega Draft matches")

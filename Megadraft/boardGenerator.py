@@ -23,8 +23,8 @@ Some cards are in multiple classes:
 cards = {
     "tank": ["ice golem", "knight", "miner", "elixir golem", "valkyrie", "rune giant",
              "goblin drill", "giant", "rascals", "bowler", "goblin machine", "royal giant",
-             "giant skeleton", "goblin giant", "royal recruits", "megaknight", "electro giant",
-             "lavahound", "golem"],
+             "giant skeleton", "goblin giant", "royal recruits", "mega knight", "electro giant",
+             "lava hound", "golem"],
     "anti_air": ["spear goblins", "bats", "archers", "minions", "mega minion", "dart goblin",
                 "princess", "firecracker", "ice wizard", "musketeer", "skeleton dragons",
                 "flying machine", "baby dragon", "zappies", "hunter", "inferno dragon", 
@@ -59,8 +59,14 @@ cards = {
 """
 Flattened version of cards, so just a set of all cards
 """
-all_cards = set().union(*cards.values())
-card_list = list(all_cards)
+card_list = []
+for category in cards:  # iteration order is insertion order
+    card_list.extend(cards[category])
+
+# Also build a set if needed
+all_cards = set(card_list)
+
+# Function to get ID
 def card_str_to_id(cardname):
     return card_list.index(cardname.lower())
 
@@ -136,6 +142,9 @@ class Board:
 
 
 
+if __name__ == "__main__":
+    print(card_list)
 
-    
+    all_cards = set().union(*cards.values())
+    card_list = list(all_cards)
 
