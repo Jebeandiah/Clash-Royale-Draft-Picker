@@ -22,15 +22,9 @@ Some cards are in multiple classes:
 """
 cards = {
     "tank": ["ice golem", "knight", "miner", "elixir golem", "valkyrie", "rune giant",
-<<<<<<< HEAD
              "goblin drill", "giant", "rascals", "bowler", "goblin machine", "royal giant",
              "giant skeleton", "goblin giant", "royal recruits", "megaknight", "electro giant",
              "lavahound", "golem"],
-=======
-             "goblin drill", "giant", "rascals", "bowler", "goblin demolisher", "royal giant",
-             "giant skeleton", "goblin giant", "royal recruits", "mega knight", "electro giant",
-             "lava hound", "golem", "goblin machine"],
->>>>>>> 1c3b85e42dd11d5eb48e7212cc73c85ea831db5c
     "anti_air": ["spear goblins", "bats", "archers", "minions", "mega minion", "dart goblin",
                 "princess", "firecracker", "ice wizard", "musketeer", "skeleton dragons",
                 "flying machine", "baby dragon", "zappies", "hunter", "inferno dragon", 
@@ -50,15 +44,9 @@ cards = {
                     "goblin curse", "arrows", "earthquake", "tornado", "fireball", 
                     "freeze", "poison", "rocket", "lightning"],
     "mini_tank": ["berserker", "knight", "miner", "royal ghost", "bandit", "fisherman",
-<<<<<<< HEAD
-                  "mini pekka", "goblin cage", "valkyrie", "dark prince", "battle healer", 
-                  "prince", "rascals", "cannon cart", "goblin machine"],
-    "anti_tank": ["cannon", "mini pekka", "goblin cage", "bomb tower", "tesla", "hunter", 
-=======
                   "mini p.e.k.k.a", "goblin cage", "valkyrie", "dark prince", "battle healer", 
                   "prince", "rascals", "cannon cart", "goblin machine"],
     "anti_tank": ["cannon", "mini p.e.k.k.a", "goblin cage", "bomb tower", "tesla", "hunter", 
->>>>>>> 1c3b85e42dd11d5eb48e7212cc73c85ea831db5c
                   "inferno dragon", "lumberjack", "barbarians", "inferno tower", "witch",
                   "rascals", "cannon cart", "elite barbarians", "sparky", "p.e.k.k.a"],
     "champion": ["little prince", "skeleton king", "golden knight", "mighty miner",
