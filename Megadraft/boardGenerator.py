@@ -22,21 +22,27 @@ Some cards are in multiple classes:
 """
 cards = {
     "tank": ["ice golem", "knight", "miner", "elixir golem", "valkyrie", "rune giant",
+<<<<<<< HEAD
              "goblin drill", "giant", "rascals", "bowler", "goblin machine", "royal giant",
              "giant skeleton", "goblin giant", "royal recruits", "megaknight", "electro giant",
              "lavahound", "golem"],
+=======
+             "goblin drill", "giant", "rascals", "bowler", "goblin demolisher", "royal giant",
+             "giant skeleton", "goblin giant", "royal recruits", "mega knight", "electro giant",
+             "lava hound", "golem", "goblin machine"],
+>>>>>>> 1c3b85e42dd11d5eb48e7212cc73c85ea831db5c
     "anti_air": ["spear goblins", "bats", "archers", "minions", "mega minion", "dart goblin",
                 "princess", "firecracker", "ice wizard", "musketeer", "skeleton dragons",
                 "flying machine", "baby dragon", "zappies", "hunter", "inferno dragon", 
                 "electro wizard", "phoenix", "magic archer", "night witch", "mother witch",
                 "wizard", "witch", "minion horde", "electro dragon", "executioner"],
-    "distraction": ["skeletons", "fire sprit", "electro spirit", "ice spirit", "heal spirit",
+    "distraction": ["skeletons", "fire spirit", "electro spirit", "ice spirit", "heal spirit",
                     "goblins", "spear goblins", "bomber", "ice golem", "berserker", "minions",
                     "skeleton army", "guards", "goblin gang"],
     "damage_spell": ["zap", "giant snowball", "barbarian barrel", "the log", "rage",
                     "goblin curse", "arrows", "earthquake", "royal delivery", "void", "fireball", 
                     "poison", "rocket", "lightning"],
-    "win_condition": ["wallbreakers", "suspicious bush", "goblin barrel", "skeleton barrel", 
+    "win_condition": ["wall breakers", "suspicious bush", "goblin barrel", "skeleton barrel", 
                       "miner", "elixir golem", "battle ram", "hog rider", "rune giant", 
                       "goblin drill", "giant", "royal hogs", "balloon", "ram rider", "graveyard",
                       "royal giant", "goblin giant", "three musketeers"],
@@ -44,15 +50,21 @@ cards = {
                     "goblin curse", "arrows", "earthquake", "tornado", "fireball", 
                     "freeze", "poison", "rocket", "lightning"],
     "mini_tank": ["berserker", "knight", "miner", "royal ghost", "bandit", "fisherman",
+<<<<<<< HEAD
                   "mini pekka", "goblin cage", "valkyrie", "dark prince", "battle healer", 
                   "prince", "rascals", "cannon cart", "goblin machine"],
     "anti_tank": ["cannon", "mini pekka", "goblin cage", "bomb tower", "tesla", "hunter", 
+=======
+                  "mini p.e.k.k.a", "goblin cage", "valkyrie", "dark prince", "battle healer", 
+                  "prince", "rascals", "cannon cart", "goblin machine"],
+    "anti_tank": ["cannon", "mini p.e.k.k.a", "goblin cage", "bomb tower", "tesla", "hunter", 
+>>>>>>> 1c3b85e42dd11d5eb48e7212cc73c85ea831db5c
                   "inferno dragon", "lumberjack", "barbarians", "inferno tower", "witch",
-                  "rascals", "cannon cart", "elite barbarians", "sparky", "pekka"],
+                  "rascals", "cannon cart", "elite barbarians", "sparky", "p.e.k.k.a"],
     "champion": ["little prince", "skeleton king", "golden knight", "mighty miner",
                  "archer queen", "monk", "goblinstein", "boss bandit"], 
     "building": ["tombstone", "cannon", "goblin hut", "goblin cage", "bomb tower", "mortar",
-                 "tesla", "furnace", "inferno tower", "barbarian hut", "xbow",
+                 "tesla", "furnace", "inferno tower", "barbarian hut", "x-bow",
                  "elixir collector"]
 }
 
@@ -60,6 +72,9 @@ cards = {
 Flattened version of cards, so just a set of all cards
 """
 all_cards = set().union(*cards.values())
+card_list = list(all_cards)
+def card_str_to_id(cardname):
+    return card_list.index(cardname.lower())
 
 #####################################################################
 
