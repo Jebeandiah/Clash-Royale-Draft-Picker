@@ -94,7 +94,7 @@ def states_from_battle(battle, bcid, idtocat):
                 for cat in idtocat[card]:
                     bcid[cat].remove(card)
                 cs.pool.append(card)
-                print("added card to pool "+str(card))
+                # print("added card to pool "+str(card))
         return
     
 
@@ -130,8 +130,8 @@ def states_from_battle(battle, bcid, idtocat):
             unpick_card(p)
             unpick_card(p)   
     # print(len(textpool))
-    for state in states:
-        print(state)
+    # for state in states:
+    #     print(state)
     return states
 
 
@@ -304,7 +304,7 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
         print("Score            :", score)
         print("----------------\n")
 if __name__ == "__main__":
-    collect_states()
+    # collect_states()
     # print(read_training_data())
     debug_training_states()
     pls = "noerror"

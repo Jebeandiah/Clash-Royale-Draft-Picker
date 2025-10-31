@@ -75,6 +75,6 @@ def read_battles(dbname=dbname, limit=None):
 
 if __name__ == "__main__":
     # print(read_battles(dbname, 1)[0])
-    format_db("testdb")
+    # format_db("testdb")
     print(read_battles())
     pls = "stop"
