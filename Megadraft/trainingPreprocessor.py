@@ -169,7 +169,7 @@ def bitpack_tensor(t):
     packed = t.matmul(2 ** torch.arange(8, dtype=torch.uint8))
     return packed.numpy().tobytes()
 
-def collect_states(dbname=dBManager.dbname, limit=1):
+def collect_states(dbname=dBManager.dbname, limit=None):
     import sqlite3
     import torch
     import ast
@@ -231,9 +231,7 @@ def collect_states(dbname=dBManager.dbname, limit=1):
     con.close()
 
 def read_training_data(dbname=dBManager.dbname, limit=None):
-    import sqlite3
-    import torch
-
+    
     con = sqlite3.connect(f'{dbname}.db')
     cur = con.cursor()
 
@@ -268,8 +266,6 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
     - next pick (card name)
     - score
     """
-    import sqlite3
-    import torch
 
     NUM_CARDS = len(bg.all_cards)
     DRAFT_STEPS = len(draftorder)

@@ -115,7 +115,7 @@ class RateLimiter:
 
 # --- MAIN SCRAPER ---
 
-async def collect_megadraft_from_top_clans(top_n_clans=5, dbname=dBManager.dbname):
+async def collect_megadraft_from_top_clans(top_n_clans=10, dbname=dBManager.dbname):
     rate_limiter = RateLimiter(REQUESTS_PER_SECOND)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     con = sqlite3.connect(f'{dbname}.db')
@@ -170,4 +170,4 @@ import ast  # for safely converting string representation of lists back to Pytho
 if __name__ == "__main__":
 
     # reset_db("testdb")
-    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=50))
+    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=600))
