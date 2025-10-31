@@ -25,7 +25,8 @@ def format_db(dbname):
     cursor.execute('''
         CREATE TABLE training (
             input BLOB NOT NULL,
-            score BLOB NOT NULL
+            next_card int NOT NULL,
+            score int NOT NULL
         )
     ''')
     con.commit()

@@ -170,26 +170,16 @@ def bitpack_tensor(t):
     return packed.numpy().tobytes()
 
 def collect_states(dbname=dBManager.dbname, limit=1):
-    con = sqlite3.connect(f"{dbname}.db")
+    import sqlite3
+    import torch
+    import ast
+    import copy
+
+    con = sqlite3.connect(f'{dbname}.db')
     cur = con.cursor()
 
-    # Prepare card mappings
-    categorized_ids = {}
-    id_to_categories = {}
-    for category in bg.cards:
-        categorized_ids[category] = []
-        for card in bg.cards[category]:
-            card_id = bg.card_str_to_id(card)
-            categorized_ids[category].append(card_id)
-            if card_id not in id_to_categories:
-                id_to_categories[card_id] = []
-            id_to_categories[card_id].append(category)
+    base_categorized_ids, id_to_categories = generate_card_refs()
 
-    NUM_CARDS = len(bg.all_cards)
-    DRAFT_STEPS = len(draftorder)
-    INPUT_LEN = NUM_CARDS*3 + DRAFT_STEPS
-
-    # Fetch battles
     query = "SELECT * FROM battles"
     if limit:
         query += f" LIMIT {limit}"
@@ -203,40 +193,51 @@ def collect_states(dbname=dBManager.dbname, limit=1):
             "player_deck": ast.literal_eval(row[2]),
             "opp_deck": ast.literal_eval(row[3])
         }
-        states = states_from_battle(battle, copy.deepcopy(categorized_ids), id_to_categories)
+
+        states = states_from_battle(battle, copy.deepcopy(base_categorized_ids), id_to_categories)
 
         for state in states:
             # Build input vector
+            NUM_CARDS = len(bg.all_cards)
+            INPUT_LEN = NUM_CARDS*3 + len(draftorder)
             input_vec = torch.zeros(INPUT_LEN, dtype=torch.uint8)
-            for i, deck in enumerate(state.decks):
-                for idx in deck:
-                    input_vec[i*NUM_CARDS + idx] = 1
-            for idx in state.pool:
-                input_vec[NUM_CARDS*2 + idx] = 1
-            input_vec[NUM_CARDS*3 + state.draftstep] = 1
 
-            # Build score vector
-            score_vec = torch.zeros(NUM_CARDS, dtype=torch.float32)
-            if state.nextpick is not None:
-                score_vec[state.nextpick] = float(state.score)
+            # Decks and pool
+            for i in state.player_deck(0):
+                input_vec[i] = 1
+            for i in state.player_deck(1):
+                input_vec[NUM_CARDS + i] = 1
+            for i in state.pool:
+                input_vec[NUM_CARDS*2 + i] = 1
+
+            # Draft step one-hot
+            if state.draftstep < len(draftorder):
+                input_vec[NUM_CARDS*3 + state.draftstep] = 1
+
+            # Bitpack input
+            input_blob = bitpack_tensor(input_vec)
+
+            # Next card and score
+            next_card = state.nextpick
+            score = int(state.score)
 
             # Insert into DB
-            input_blob = bitpack_tensor(input_vec)
-            score_blob = score_vec.numpy().tobytes()
-            cur.execute("INSERT INTO training (input, score) VALUES (?, ?)", (input_blob, score_blob))
+            cur.execute(
+                "INSERT INTO training (input, next_card, score) VALUES (?, ?, ?)",
+                (input_blob, next_card, score)
+            )
 
     con.commit()
     con.close()
 
+def read_training_data(dbname=dBManager.dbname, limit=None):
+    import sqlite3
+    import torch
 
-def read_training_data(dbname=dBManager.dbname,  draft_steps=None, limit=None):
-    NUM_CARDS = len(bg.all_cards)
-    DRAFT_STEPS = len(draftorder) if draft_steps is None else draft_steps
-    INPUT_LEN = NUM_CARDS*3 + DRAFT_STEPS
-
-    con = sqlite3.connect(f"{dbname}.db")
+    con = sqlite3.connect(f'{dbname}.db')
     cur = con.cursor()
-    query = "SELECT input, score FROM training"
+
+    query = "SELECT input, next_card, score FROM training"
     if limit:
         query += f" LIMIT {limit}"
     cur.execute(query)
@@ -244,24 +245,71 @@ def read_training_data(dbname=dBManager.dbname,  draft_steps=None, limit=None):
     con.close()
 
     inputs = []
+    next_cards = []
     scores = []
 
-    for input_blob, score_blob in rows:
-        # Make a copy to avoid the "non-writable" warning
+    for input_blob, next_card, score in rows:
         packed = torch.tensor(list(input_blob), dtype=torch.uint8)
-        # Reshape into bytes
         t = packed.view(-1, 1)
-        # Unpack bits
-        unpacked = ((t & (1 << torch.arange(8))) > 0).to(torch.uint8)
-        unpacked = torch.flip(unpacked, dims=[1]).flatten()[:INPUT_LEN]
-        inputs.append(unpacked)
+        bits = ((t & (1 << torch.arange(8))) > 0).to(torch.uint8)
+        bits = torch.flip(bits, dims=[1]).flatten()
+        inputs.append(bits)
+        next_cards.append(next_card)
+        scores.append(score)
 
-        # Score vector
-        scores.append(torch.tensor(list(score_blob), dtype=torch.float32))
+    return torch.stack(inputs), torch.tensor(next_cards), torch.tensor(scores)
+def debug_training_states(dbname=dBManager.dbname, limit=None):
+    """
+    Reads the training database and prints the full state for each entry:
+    - deck1
+    - deck2
+    - pool
+    - draft step
+    - next pick (card name)
+    - score
+    """
+    import sqlite3
+    import torch
 
-    return torch.stack(inputs), torch.stack(scores)
+    NUM_CARDS = len(bg.all_cards)
+    DRAFT_STEPS = len(draftorder)
+    INPUT_LEN = NUM_CARDS*3 + DRAFT_STEPS
+
+    con = sqlite3.connect(f"{dbname}.db")
+    cur = con.cursor()
+
+    query = "SELECT input, next_card, score FROM training"
+    if limit:
+        query += f" LIMIT {limit}"
+    cur.execute(query)
+    rows = cur.fetchall()
+    con.close()
+
+    for i, (input_blob, next_card_idx, score) in enumerate(rows):
+        # Unpack input vector
+        packed = torch.tensor(list(input_blob), dtype=torch.uint8)
+        t = packed.view(-1, 1)
+        bits = ((t & (1 << torch.arange(8))) > 0).to(torch.uint8)
+        bits = torch.flip(bits, dims=[1]).flatten()[:INPUT_LEN]
+
+        # Decode decks and pool
+        deck1_indices = bits[:NUM_CARDS].nonzero(as_tuple=True)[0].tolist()
+        deck2_indices = bits[NUM_CARDS:NUM_CARDS*2].nonzero(as_tuple=True)[0].tolist()
+        pool_indices  = bits[NUM_CARDS*2:NUM_CARDS*3].nonzero(as_tuple=True)[0].tolist()
+        draft_step_index = (bits[NUM_CARDS*3:] == 1).nonzero(as_tuple=True)[0].item() \
+            if (bits[NUM_CARDS*3:] == 1).any() else None
+
+        print(f"--- State {i} ---")
+        print("Deck 1:", [bg.card_list[idx] for idx in deck1_indices])
+        print("Deck 2:", [bg.card_list[idx] for idx in deck2_indices])
+        print("Pool  :", [bg.card_list[idx] for idx in pool_indices])
+        print("Draft step index:", draft_step_index)
+        print("Next pick card  :", bg.card_list[next_card_idx])
+        print("Score            :", score)
+        print("----------------\n")
 if __name__ == "__main__":
-    # collect_states()
-    print(read_training_data())
+    collect_states()
+    # print(read_training_data())
+    debug_training_states()
     pls = "noerror"
 
