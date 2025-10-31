@@ -60,11 +60,17 @@ cards = {
 Flattened version of cards, so just a set of all cards
 """
 card_list = []
-for category in cards:  # iteration order is insertion order
-    card_list.extend(cards[category])
+all_cards = set()
+for category in cards:  
+    for card in cards[category]:  # <-- iterate over the card list, not the string key
+        if card not in all_cards:
+            all_cards.add(card)
+            card_list.append(card)
+
+
 
 # Also build a set if needed
-all_cards = set(card_list)
+# all_cards = set(card_list)
 
 # Function to get ID
 def card_str_to_id(cardname):
@@ -143,8 +149,10 @@ class Board:
 
 
 if __name__ == "__main__":
-    print(card_list)
 
-    all_cards = set().union(*cards.values())
-    card_list = list(all_cards)
+
+    print((card_list))
+    print((all_cards))
+
+    
 

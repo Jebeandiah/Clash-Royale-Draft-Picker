@@ -6,7 +6,6 @@ import sqlite3
 import ast
 import itertools
 import torch
-
 draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]
 category_totals = {"tank": 4,
         "anti_air": 4,
@@ -95,7 +94,7 @@ def states_from_battle(battle, bcid, idtocat):
                 for cat in idtocat[card]:
                     bcid[cat].remove(card)
                 cs.pool.append(card)
-                # print("added card to pool "+str(card))
+                print("added card to pool "+str(card))
         return
     
 
@@ -131,8 +130,8 @@ def states_from_battle(battle, bcid, idtocat):
             unpick_card(p)
             unpick_card(p)   
     # print(len(textpool))
-    # for state in states:
-        # print(state)
+    for state in states:
+        print(state)
     return states
 
 
@@ -148,19 +147,55 @@ def generate_card_refs():
                 id_to_categories[card_id] =[]
             id_to_categories[card_id] +=[category]
     return categorized_ids, id_to_categories
+def bitpack_tensor(t):
+    """
+    Safely pack a 1D uint8 tensor of 0/1 bits into bytes.
+    Works for any length.
+    """
+    t = t.flatten().to(torch.uint8)
+    n = t.numel()
+    if n == 0:
+        return b""
+
+    # Pad to multiple of 8
+    pad = (8 - n % 8) % 8
+    if pad > 0:
+        t = torch.cat([t, torch.zeros(pad, dtype=torch.uint8)])
+
+    # Reshape to bytes
+    t = t.view(-1, 8)
+    # Reverse bits in each byte safely
+    t = torch.flip(t, dims=[1])
+    packed = t.matmul(2 ** torch.arange(8, dtype=torch.uint8))
+    return packed.numpy().tobytes()
+
 def collect_states(dbname=dBManager.dbname, limit=1):
-    con = sqlite3.connect(f'{dbname}.db')
+    con = sqlite3.connect(f"{dbname}.db")
     cur = con.cursor()
 
-    base_categorized_ids, id_to_categories = generate_card_refs()
+    # Prepare card mappings
+    categorized_ids = {}
+    id_to_categories = {}
+    for category in bg.cards:
+        categorized_ids[category] = []
+        for card in bg.cards[category]:
+            card_id = bg.card_str_to_id(card)
+            categorized_ids[category].append(card_id)
+            if card_id not in id_to_categories:
+                id_to_categories[card_id] = []
+            id_to_categories[card_id].append(category)
 
+    NUM_CARDS = len(bg.all_cards)
+    DRAFT_STEPS = len(draftorder)
+    INPUT_LEN = NUM_CARDS*3 + DRAFT_STEPS
+
+    # Fetch battles
     query = "SELECT * FROM battles"
     if limit:
         query += f" LIMIT {limit}"
     cur.execute(query)
     rows = cur.fetchall()
 
-    battles = []
     for row in rows:
         battle = {
             "id": row[0],
@@ -168,42 +203,65 @@ def collect_states(dbname=dBManager.dbname, limit=1):
             "player_deck": ast.literal_eval(row[2]),
             "opp_deck": ast.literal_eval(row[3])
         }
-        battles.append(battle)
+        states = states_from_battle(battle, copy.deepcopy(categorized_ids), id_to_categories)
 
-    num_cards = len(bg.card_list)
+        for state in states:
+            # Build input vector
+            input_vec = torch.zeros(INPUT_LEN, dtype=torch.uint8)
+            for i, deck in enumerate(state.decks):
+                for idx in deck:
+                    input_vec[i*NUM_CARDS + idx] = 1
+            for idx in state.pool:
+                input_vec[NUM_CARDS*2 + idx] = 1
+            input_vec[NUM_CARDS*3 + state.draftstep] = 1
 
-    for battle in battles:
-        states = states_from_battle(
-            battle,
-            copy.deepcopy(base_categorized_ids),
-            id_to_categories
-        )
+            # Build score vector
+            score_vec = torch.zeros(NUM_CARDS, dtype=torch.float32)
+            if state.nextpick is not None:
+                score_vec[state.nextpick] = float(state.score)
 
-        for s in states:
-            # --- 1️⃣ Encode the state as a tensor ---
-            input_tensor = torch.tensor(
-                s.pool + s.decks[0] + s.decks[1] + [s.draftstep],
-                dtype=torch.int16
-            )
-            input_blob = input_tensor.numpy().tobytes()  # convert to bytes for SQLite
-
-            # --- 2️⃣ Target tensor (nextpick one-hot * score) ---
-            target_tensor = torch.zeros(num_cards, dtype=torch.float32)
-            if 0 <= s.nextpick < num_cards:
-                target_tensor[s.nextpick] = float(s.score)
-            score_blob = target_tensor.numpy().tobytes()
-
-            # --- 3️⃣ Insert into database ---
-            cur.execute(
-                "INSERT INTO training (input, score) VALUES (?, ?)",
-                (input_blob, score_blob)
-            )
+            # Insert into DB
+            input_blob = bitpack_tensor(input_vec)
+            score_blob = score_vec.numpy().tobytes()
+            cur.execute("INSERT INTO training (input, score) VALUES (?, ?)", (input_blob, score_blob))
 
     con.commit()
     con.close()
-    print("✅ Training data inserted successfully.")
 
+
+def read_training_data(dbname=dBManager.dbname,  draft_steps=None, limit=None):
+    NUM_CARDS = len(bg.all_cards)
+    DRAFT_STEPS = len(draftorder) if draft_steps is None else draft_steps
+    INPUT_LEN = NUM_CARDS*3 + DRAFT_STEPS
+
+    con = sqlite3.connect(f"{dbname}.db")
+    cur = con.cursor()
+    query = "SELECT input, score FROM training"
+    if limit:
+        query += f" LIMIT {limit}"
+    cur.execute(query)
+    rows = cur.fetchall()
+    con.close()
+
+    inputs = []
+    scores = []
+
+    for input_blob, score_blob in rows:
+        # Make a copy to avoid the "non-writable" warning
+        packed = torch.tensor(list(input_blob), dtype=torch.uint8)
+        # Reshape into bytes
+        t = packed.view(-1, 1)
+        # Unpack bits
+        unpacked = ((t & (1 << torch.arange(8))) > 0).to(torch.uint8)
+        unpacked = torch.flip(unpacked, dims=[1]).flatten()[:INPUT_LEN]
+        inputs.append(unpacked)
+
+        # Score vector
+        scores.append(torch.tensor(list(score_blob), dtype=torch.float32))
+
+    return torch.stack(inputs), torch.stack(scores)
 if __name__ == "__main__":
-    collect_states()
-    # print(generate_card_refs())
+    # collect_states()
+    print(read_training_data())
     pls = "noerror"
+
