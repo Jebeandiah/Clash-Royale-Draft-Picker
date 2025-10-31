@@ -5,7 +5,7 @@ import boardGenerator as bg
 import sqlite3
 import ast
 import itertools
-import array
+import torch
 
 draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]
 category_totals = {"tank": 4,
@@ -157,7 +157,6 @@ def collect_states(dbname=dBManager.dbname, limit=1):
     query = "SELECT * FROM battles"
     if limit:
         query += f" LIMIT {limit}"
-    
     cur.execute(query)
     rows = cur.fetchall()
 
@@ -181,19 +180,20 @@ def collect_states(dbname=dBManager.dbname, limit=1):
         )
 
         for s in states:
-            # --- Encode the state as an input vector using Python lists + array ---
-            input_list = s.pool + s.decks[0] + s.decks[1] + [s.draftstep]
-            input_arr = array.array('h', input_list)  # 'h' = 16-bit signed integer
-            input_blob = input_arr.tobytes()
+            # --- 1️⃣ Encode the state as a tensor ---
+            input_tensor = torch.tensor(
+                s.pool + s.decks[0] + s.decks[1] + [s.draftstep],
+                dtype=torch.int16
+            )
+            input_blob = input_tensor.numpy().tobytes()  # convert to bytes for SQLite
 
-            # --- Create the target vector (one-hot scaled by score) ---
-            target_list = [0.0] * num_cards
+            # --- 2️⃣ Target tensor (nextpick one-hot * score) ---
+            target_tensor = torch.zeros(num_cards, dtype=torch.float32)
             if 0 <= s.nextpick < num_cards:
-                target_list[s.nextpick] = float(s.score)
-            target_arr = array.array('f', target_list)  # 'f' = 32-bit float
-            score_blob = target_arr.tobytes()
+                target_tensor[s.nextpick] = float(s.score)
+            score_blob = target_tensor.numpy().tobytes()
 
-            # --- Insert into database ---
+            # --- 3️⃣ Insert into database ---
             cur.execute(
                 "INSERT INTO training (input, score) VALUES (?, ?)",
                 (input_blob, score_blob)
