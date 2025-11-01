@@ -25,8 +25,8 @@ class draft_state:
         self.draftstep =0
         self.nextpick=0
         self.score=0
-    def player_deck(self, player):
-        return self.decks[player]
+    def player_deck(self):
+        return self.decks[0]
     def __str__(self):
         print_string = ""
         for card in self.pool:
@@ -103,32 +103,34 @@ def states_from_battle(battle, bcid, idtocat):
 
     generate_draft_pool()
     states=[]
-    def pick_card(p):
-        cs.player_deck(p).append(cs.pool.pop())
+    def pick_card():
+        cs.player_deck().append(cs.pool.pop())
         return
-    def unpick_card(p):
-        card= cs.player_deck(p).pop()
+    def unpick_card():
+        card= cs.player_deck().pop()
         cs.pool.append(card)
         cs.nextpick = card
-        cs.draftstep = i
         states.append(copy.deepcopy(cs))
         return
     cs.decks =[battle["player_deck"]]+[battle["opp_deck"]]
     for i, pickcount in enumerate(draftorder):
+        cs.decks = [cs.decks[1], cs.decks[0]]  # now deck0 is always the picker
         # player = i%2
         # ind = len(cs.player_deck(player))
         p = i%2
+        cs.draftstep = i
+
         cs.score = battle["low_tower_dif"]
         if p!=0:
             cs.score*=-1
         for j in range(pickcount):
-            unpick_card(p)
+            unpick_card()
         if pickcount >1:
-            pick_card(p)
-            pick_card(p)
-            cs.player_deck(p)[-1],cs.player_deck(p)[-2]=cs.player_deck(p)[-2],cs.player_deck(p)[-1]
-            unpick_card(p)
-            unpick_card(p)   
+            pick_card()
+            pick_card()
+            cs.player_deck()[-1],cs.player_deck()[-2]=cs.player_deck()[-2],cs.player_deck()[-1]
+            unpick_card()
+            unpick_card()   
     # print(len(textpool))
     # for state in states:
     #     print(state)
@@ -203,9 +205,9 @@ def collect_states(dbname=dBManager.dbname, limit=None):
             input_vec = torch.zeros(INPUT_LEN, dtype=torch.uint8)
 
             # Decks and pool
-            for i in state.player_deck(0):
+            for i in state.decks[0]:
                 input_vec[i] = 1
-            for i in state.player_deck(1):
+            for i in state.decks[1]:
                 input_vec[NUM_CARDS + i] = 1
             for i in state.pool:
                 input_vec[NUM_CARDS*2 + i] = 1
