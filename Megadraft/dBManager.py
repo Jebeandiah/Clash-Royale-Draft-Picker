@@ -76,23 +76,23 @@ def read_battles(dbname=dbname, limit=None):
 if __name__ == "__main__":
     # print(read_battles(dbname, 1)[0])
     # format_db("testdb")
-    # con = sqlite3.connect(f'{dbname}.db')
-    # cursor = con.cursor()
-    # cursor.execute("DROP TABLE IF EXISTS training")
+    con = sqlite3.connect(f'{dbname}.db')
+    cursor = con.cursor()
+    cursor.execute("DROP TABLE IF EXISTS training")
     
-    # # Create the new table
-    # cursor.execute('''
-    #     CREATE TABLE training (
-    #         input BLOB NOT NULL,
-    #         next_card int NOT NULL,
-    #         score int NOT NULL
-    #     )
-    # ''')
-    # con.commit()
+    # Create the new table
+    cursor.execute('''
+        CREATE TABLE training (
+            input BLOB NOT NULL,
+            next_card int NOT NULL,
+            score int NOT NULL
+        )
+    ''')
+    con.commit()
     
-    # # Optional: shrink the database file to reclaim space
-    # con.execute("VACUUM")
+    # Optional: shrink the database file to reclaim space
+    con.execute("VACUUM")
     
-    # con.close()
+    con.close()
     print(read_battles())
     pls = "stop"

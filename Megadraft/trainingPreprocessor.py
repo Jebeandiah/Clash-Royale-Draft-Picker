@@ -6,7 +6,7 @@ import sqlite3
 import ast
 import itertools
 import torch
-draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]
+draftorder = [1, 2, 2, 2, 2, 2, 2,2, 1]
 category_totals = {"tank": 4,
         "anti_air": 4,
          "distraction": 4,
@@ -102,17 +102,20 @@ def states_from_battle(battle, bcid, idtocat):
 
 
     generate_draft_pool()
-    states=[]
     def pick_card():
         cs.player_deck().append(cs.pool.pop())
         return
     def unpick_card():
+        states.append(copy.deepcopy(cs))
+
         card= cs.player_deck().pop()
         cs.pool.append(card)
         cs.nextpick = card
-        states.append(copy.deepcopy(cs))
         return
     cs.decks =[battle["player_deck"]]+[battle["opp_deck"]]
+    states=[]
+    cs.score = battle["low_tower_dif"]
+
     for i, pickcount in enumerate(draftorder):
         cs.decks = [cs.decks[1], cs.decks[0]]  # now deck0 is always the picker
         # player = i%2
@@ -120,7 +123,6 @@ def states_from_battle(battle, bcid, idtocat):
         p = i%2
         cs.draftstep = i
 
-        cs.score = battle["low_tower_dif"]
         for j in range(pickcount):
             unpick_card()
         if pickcount >1:
