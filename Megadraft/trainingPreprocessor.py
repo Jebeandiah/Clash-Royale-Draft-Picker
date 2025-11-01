@@ -121,8 +121,6 @@ def states_from_battle(battle, bcid, idtocat):
         cs.draftstep = i
 
         cs.score = battle["low_tower_dif"]
-        if p!=0:
-            cs.score*=-1
         for j in range(pickcount):
             unpick_card()
         if pickcount >1:
@@ -131,6 +129,8 @@ def states_from_battle(battle, bcid, idtocat):
             cs.player_deck()[-1],cs.player_deck()[-2]=cs.player_deck()[-2],cs.player_deck()[-1]
             unpick_card()
             unpick_card()   
+        cs.score*=-1
+
     # print(len(textpool))
     # for state in states:
     #     print(state)
@@ -196,7 +196,9 @@ def collect_states(dbname=dBManager.dbname, limit=None):
             "opp_deck": ast.literal_eval(row[3])
         }
 
-        states = states_from_battle(battle, copy.deepcopy(base_categorized_ids), id_to_categories)
+        states = states_from_battle(copy.deepcopy(battle), copy.deepcopy(base_categorized_ids), id_to_categories)
+        # battle["player_deck"], battle["opp_deck"] = battle["opp_deck"], battle["player_deck"]
+        # states += states_from_battle(battle, copy.deepcopy(base_categorized_ids), id_to_categories)
 
         for state in states:
             # Build input vector
@@ -306,7 +308,7 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
         print("Score            :", score)
         print("----------------\n")
 if __name__ == "__main__":
-    # collect_states()
+    collect_states()
     # print(read_training_data())
     debug_training_states()
     pls = "noerror"

@@ -9,9 +9,10 @@ INPUT_LEN = 357
 OUTPUT_LEN = 116
 BATCH_SIZE = 512
 NUM_WORKERS = 0
-EPOCHS = 50
+EPOCHS = 200
 LR = 1e-3
-DROPOUT = 0.3  # <-- tune this (0.2–0.5 usually good)
+DROPOUT = 0.3
+REG_WEIGHT = 1e-4  # regularize non-target outputs
 
 # -----------------------
 # Dataset
@@ -40,7 +41,7 @@ class DraftDataset(Dataset):
 
 
 # -----------------------
-# Model (with dropout)
+# Model (with LayerNorm + Dropout)
 # -----------------------
 class DraftMLP(nn.Module):
     def __init__(self, input_size=INPUT_LEN, output_size=OUTPUT_LEN, dropout=DROPOUT):
@@ -48,13 +49,20 @@ class DraftMLP(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(input_size, 1024),
             nn.ReLU(),
-            nn.Dropout(dropout),  # <-- added
+            nn.LayerNorm(1024),
+            nn.Dropout(dropout),
             nn.Linear(1024, 512),
             nn.ReLU(),
+            nn.LayerNorm(512),
             nn.Dropout(dropout),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Dropout(dropout),  # <-- added
+            nn.LayerNorm(256),
+            nn.Dropout(dropout),
+            # nn.Linear(256, 128),
+            # nn.ReLU(),
+            # nn.LayerNorm(128),
+            # nn.Dropout(dropout),
             nn.Linear(256, output_size)
         )
 
@@ -94,13 +102,21 @@ def train():
         for inputs, next_card, score in train_loader:
             inputs = inputs.to(device, non_blocking=True)
             next_card = next_card.to(device, dtype=torch.long, non_blocking=True)
-            score = score.to(device, dtype=torch.float, non_blocking=True)
+            # normalize score to [-1,1] temp 10k as normalizing value
+            score_norm = score.to(device, dtype=torch.float, non_blocking=True) / 10000.0
 
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                outputs = model(inputs)  # [B, 116]
-                pred_score = outputs.gather(1, next_card.view(-1, 1)).squeeze(1)
-                loss = criterion(pred_score, score)
+                outputs = model(inputs)  # [B,116]
+                pred_score = outputs.gather(1, next_card.view(-1,1)).squeeze(1)
+                target_loss = criterion(pred_score, score_norm)
+
+                # penalize magnitude of non-target outputs
+                mask = torch.ones_like(outputs)
+                mask.scatter_(1, next_card.view(-1,1), 0.0)
+                reg_loss = (outputs * mask).pow(2).mean()
+
+                loss = target_loss + REG_WEIGHT * reg_loss
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -117,15 +133,22 @@ def train():
             for inputs, next_card, score in val_loader:
                 inputs = inputs.to(device, non_blocking=True)
                 next_card = next_card.to(device, dtype=torch.long, non_blocking=True)
-                score = score.to(device, dtype=torch.float, non_blocking=True)
+                score_norm = score.to(device, dtype=torch.float, non_blocking=True) / 10000.0
+
                 outputs = model(inputs)
-                pred_score = outputs.gather(1, next_card.view(-1, 1)).squeeze(1)
-                val_loss += criterion(pred_score, score).item()
+                pred_score = outputs.gather(1, next_card.view(-1,1)).squeeze(1)
+                target_loss = criterion(pred_score, score_norm)
+
+                mask = torch.ones_like(outputs)
+                mask.scatter_(1, next_card.view(-1,1), 0.0)
+                reg_loss = (outputs * mask).pow(2).mean()
+
+                val_loss += (target_loss + REG_WEIGHT * reg_loss).item()
         val_loss /= len(val_loader)
 
-        print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {avg_loss:.4f} - Val Loss: {val_loss:.4f}")
+        print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {avg_loss:.6f} - Val Loss: {val_loss:.6f}")
 
-    torch.save(model.state_dict(), "draft_mlp_score_dropout.pth")
+    torch.save(model.state_dict(), "draft_mlp_score_dropout_norm.pth")
     print("✅ Training complete — model saved to draft_mlp_score_dropout.pth")
 
 
