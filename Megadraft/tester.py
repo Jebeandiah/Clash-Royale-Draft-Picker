@@ -12,7 +12,7 @@ draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]  # picks per turn, player 1 starts
 # -----------------------
 # Load model
 # -----------------------
-model = testmodel.DraftMLP().to(device)
+model = testmodel.StructuredDraftMLP().to(device)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device), strict=False)
 model.eval()
 

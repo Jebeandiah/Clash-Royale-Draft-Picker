@@ -309,7 +309,7 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
         print("Score            :", score)
         print("----------------\n")
 if __name__ == "__main__":
-    # collect_states()
+    collect_states()
     # print(read_training_data())
     debug_training_states()
     pls = "noerror"
