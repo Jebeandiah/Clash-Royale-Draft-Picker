@@ -11,6 +11,7 @@ BATCH_SIZE = 512
 NUM_WORKERS = 0
 EPOCHS = 50
 LR = 1e-3
+DROPOUT = 0.3  # <-- tune this (0.2–0.5 usually good)
 
 # -----------------------
 # Dataset
@@ -37,22 +38,29 @@ class DraftDataset(Dataset):
         x, y, score = self.samples[idx]
         return x, y, score
 
+
 # -----------------------
-# Model
+# Model (with dropout)
 # -----------------------
 class DraftMLP(nn.Module):
-    def __init__(self, input_size=INPUT_LEN, output_size=OUTPUT_LEN):
+    def __init__(self, input_size=INPUT_LEN, output_size=OUTPUT_LEN, dropout=DROPOUT):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_size, 1024),
             nn.ReLU(),
+            nn.Dropout(dropout),  # <-- added
             nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(512, output_size)
+            nn.Dropout(dropout),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout),  # <-- added
+            nn.Linear(256, output_size)
         )
 
     def forward(self, x):
         return self.net(x)
+
 
 # -----------------------
 # Training
@@ -62,7 +70,6 @@ def train():
     print(f"Using device: {device}")
 
     dataset = DraftDataset(DB_NAME)
-    # split 90% train / 10% validation
     n_train = int(0.9 * len(dataset))
     n_val = len(dataset) - n_train
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [n_train, n_val])
@@ -118,8 +125,8 @@ def train():
 
         print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {avg_loss:.4f} - Val Loss: {val_loss:.4f}")
 
-    torch.save(model.state_dict(), "draft_mlp_score.pth")
-    print("✅ Training complete — model saved to draft_mlp_score.pth")
+    torch.save(model.state_dict(), "draft_mlp_score_dropout.pth")
+    print("✅ Training complete — model saved to draft_mlp_score_dropout.pth")
 
 
 if __name__ == "__main__":
