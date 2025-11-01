@@ -1,7 +1,6 @@
-# tester_state_value.py
 import torch
 from boardGenerator import Board, card_list
-import testmodel   # optional: can use ValueNet class defined below instead of testmodel
+import testmodel  # optional: can use ValueNet class defined below instead of testmodel
 
 MODEL_PATH = "value_net_best.pth"   # adjust to final filename
 INPUT_LEN = 357
@@ -9,14 +8,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 draftorder = [1,2,2,2,2,2,2,2,1]
 
-# If you have the ValueNet defined in trainer file, you can import or redefine here.
-
+# Load model
 model = testmodel.ValueNet().to(device)
 state = torch.load(MODEL_PATH, map_location=device)
 model.load_state_dict(state, strict=False)
 model.eval()
 
-# helper: encode state where picker_deck is first (deck0)
+# -----------------------
+# Helper: encode state
+# -----------------------
 def encode_state(picker_deck, other_deck, pool, draft_idx):
     vec = torch.zeros(INPUT_LEN, dtype=torch.float32)
     # picker deck (0..115)
@@ -39,68 +39,119 @@ def encode_state(picker_deck, other_deck, pool, draft_idx):
         vec[off + draft_idx] = 1.0
     return vec.unsqueeze(0).to(device)
 
-# evaluate all candidate picks at once (fast)
-def best_pick_for_state(picker_deck, other_deck, pool, draft_idx):
-    # produce a batch of states, one per candidate card
+# -----------------------
+# Evaluate all candidate picks and return full score distribution
+# -----------------------
+def pick_scores_for_state(picker_deck, other_deck, pool, draft_idx):
     states = []
     candidate_cards = []
     for card in pool:
-        # copy decks & pool
         pd = list(picker_deck)
         od = list(other_deck)
         p_copy = list(pool)
-        # simulate pick: remove card from pool and add to picker deck
         p_copy.remove(card)
         pd.append(card)
-        s = encode_state(pd, od, p_copy, draft_idx)  # using picker first encoding
+        s = encode_state(pd, od, p_copy, draft_idx)
         states.append(s)
         candidate_cards.append(card)
 
     if len(states) == 0:
-        return None, None
+        return [], []
 
-    batch = torch.cat(states, dim=0)  # shape [N, 357]
+    batch = torch.cat(states, dim=0)
     with torch.no_grad():
-        vals = model(batch)   # shape [N]
-    best_idx = torch.argmax(vals).item()
-    return candidate_cards[best_idx], vals[best_idx].item()
+        vals = model(batch)  # shape [N]
+    return candidate_cards, vals.cpu().tolist()
 
-# simulate full megadraft with model selecting for both players
+# -----------------------
+# Simulate full megadraft with score distribution at each pick
+# -----------------------
 def simulate_self_play():
     board = Board()
     pool = board.board.copy()
     p1, p2 = [], []
-    cumulative_pick = 9
+    cumulative_pick = 8
+
     for turn_idx, pick_count in enumerate(draftorder):
         picker = 0 if turn_idx % 2 == 0 else 1
         for pick_i in range(pick_count):
-            # ensure picker_deck is first
             picker_deck = p1 if picker == 0 else p2
             other_deck = p2 if picker == 0 else p1
-            # choose best pick
-            best_card, val = best_pick_for_state(picker_deck, other_deck, pool, cumulative_pick)
-            if best_card is None:
+
+            candidate_cards, scores = pick_scores_for_state(picker_deck, other_deck, pool, cumulative_pick)
+            if not candidate_cards:
                 break
-            # apply
+
+            # Sort by score descending
+            sorted_cards = sorted(zip(candidate_cards, scores), key=lambda x: x[1], reverse=True)
+
+            # Display rectangularly
+            print(f"Draft step {cumulative_pick}, Player {picker+1} pick {pick_i+1}:")
+            row_len = 4  # number of cards per row
+            for i in range(0, len(sorted_cards), row_len):
+                row = sorted_cards[i:i+row_len]
+                print("  " + " | ".join(f"{c}:{s:.4f}" for c, s in row))
+            print()
+
+            # Pick best card
+            best_card = sorted_cards[0][0]
             picker_deck.append(best_card)
             pool.remove(best_card)
-            print(f"Turn {cumulative_pick}: Player {picker+1} picked {best_card} (value {val:.4f}), remaining {len(pool)}")
+            print(f"  -> Selected: {best_card}\n")
         cumulative_pick -= 1
+
     print("Final decks:")
     print("P1:", p1)
     print("P2:", p2)
 
-# single-pick example (manual)
-def demo_one_board():
+def simulate_vs_human():
     board = Board()
     pool = board.board.copy()
-    p1, p2 = [], []
-    print("Board pool:", pool)
-    # example: let model pick for player2 on first picker turn
-    # assume picker is player1 first; let's show best pick for player1
-    best_card, val = best_pick_for_state([], [], pool, 0)
-    print("Best pick (empty decks) according to model:", best_card, val)
+    human, ai = [], []
+    cumulative_pick = 8
 
+    for turn_idx, pick_count in enumerate(draftorder):
+        is_human_turn = (turn_idx % 2 == 0)  # Human is Player 1
+        picker_deck = human if is_human_turn else ai
+        other_deck = ai if is_human_turn else human
+
+        for pick_i in range(pick_count):
+            candidate_cards, scores = pick_scores_for_state(picker_deck, other_deck, pool, cumulative_pick)
+            if not candidate_cards:
+                break
+
+            sorted_cards = sorted(zip(candidate_cards, scores), key=lambda x: x[1], reverse=True)
+
+            print(f"\nDraft step {cumulative_pick}, {'Human' if is_human_turn else 'AI'} pick {pick_i+1}:")
+            row_len = 4
+            for i in range(0, len(sorted_cards), row_len):
+                row = sorted_cards[i:i+row_len]
+                print("  " + " | ".join(f"{c}:{s:.4f}" for c, s in row))
+            print()
+
+            if is_human_turn:
+                # Ask human to pick a card
+                while True:
+                    pick = input("Choose your card from pool: ").strip()
+                    if pick in pool:
+                        selected = pick
+                        break
+                    print("Invalid card. Try again.")
+            else:
+                # AI picks best card
+                selected = sorted_cards[0][0]
+
+            picker_deck.append(selected)
+            pool.remove(selected)
+            print(f"  -> Selected: {selected}")
+
+        cumulative_pick -= 1
+
+    print("\nFinal decks:")
+    print("Human:", human)
+    print("AI   :", ai)
+
+# -----------------------
 if __name__ == "__main__":
-    # demo_one_board()
+    # simulate_vs_human()
     simulate_self_play()

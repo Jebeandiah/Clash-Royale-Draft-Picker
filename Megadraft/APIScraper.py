@@ -170,4 +170,4 @@ import ast  # for safely converting string representation of lists back to Pytho
 if __name__ == "__main__":
 
     # reset_db("testdb")
-    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=600))
+    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=1000))

@@ -125,12 +125,12 @@ def states_from_battle(battle, bcid, idtocat):
 
         for j in range(pickcount):
             unpick_card()
-        if pickcount >1:
-            pick_card()
-            pick_card()
-            cs.player_deck()[-1],cs.player_deck()[-2]=cs.player_deck()[-2],cs.player_deck()[-1]
-            unpick_card()
-            unpick_card()   
+        # if pickcount >1:
+        #     pick_card()
+        #     pick_card()
+        #     cs.player_deck()[-1],cs.player_deck()[-2]=cs.player_deck()[-2],cs.player_deck()[-1]
+        #     unpick_card()
+        #     unpick_card()   
         cs.score*=-1
 
     # print(len(textpool))
