@@ -113,6 +113,8 @@ def states_from_battle(battle, bcid, idtocat):
         states.append(copy.deepcopy(cs))
         return
     cs.decks =[battle["player_deck"]]+[battle["opp_deck"]]
+    cs.score = battle["low_tower_dif"]
+
     for i, pickcount in enumerate(draftorder):
         cs.decks = [cs.decks[1], cs.decks[0]]  # now deck0 is always the picker
         # player = i%2
@@ -120,7 +122,6 @@ def states_from_battle(battle, bcid, idtocat):
         p = i%2
         cs.draftstep = i
 
-        cs.score = battle["low_tower_dif"]
         for j in range(pickcount):
             unpick_card()
         if pickcount >1:
@@ -308,7 +309,7 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
         print("Score            :", score)
         print("----------------\n")
 if __name__ == "__main__":
-    collect_states()
+    # collect_states()
     # print(read_training_data())
     debug_training_states()
     pls = "noerror"

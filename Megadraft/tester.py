@@ -134,7 +134,7 @@ def simulate_self_play():
             pool.remove(picked_card)
             print(f"Player {player+1} picked: {picked_card} | Remaining pool: {len(pool)} cards")
 
-            cumulative_pick -= 1
+        cumulative_pick -= 1
 
     print("\nFinal Decks (Self-Play):")
     print("Player 1:", player1_deck)
