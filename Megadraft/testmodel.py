@@ -11,15 +11,14 @@ DB_NAME = "testdb.db"
 INPUT_LEN = 357
 BATCH_SIZE = 256
 NUM_WORKERS = 0
-EPOCHS = 300
+EPOCHS = 150
 LR = 1e-3
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
-SCALE = 10000.0   # divide score by this to get roughly [-1,1]
-
+SCALE = 10000.0  # rough scale for score
 
 # -----------------------
-# Dataset: preloads all data to GPU
+# Dataset
 # -----------------------
 class StateValueDataset(Dataset):
     def __init__(self, db_name, device='cuda'):
@@ -32,37 +31,38 @@ class StateValueDataset(Dataset):
         if len(rows) == 0:
             raise RuntimeError("No training rows found in DB training table.")
 
-        NUM_BITS = INPUT_LEN
-        inputs = []
-        scores = []
+        inputs, scores = [], []
+
+        # First, load raw scores to compute mean for centering
+        raw_scores = [float(score)/SCALE for _, score in rows]
+        mean_score = sum(raw_scores)/len(raw_scores)
+        std_score = (sum((s-mean_score)**2 for s in raw_scores)/len(raw_scores))**0.5
 
         for input_blob, score in rows:
             packed = torch.tensor(list(input_blob), dtype=torch.uint8)
             t = packed.view(-1, 1)
             bits = ((t & (1 << torch.arange(8))) > 0).to(torch.float32)
-            bits = torch.flip(bits, dims=[1]).flatten()[:NUM_BITS]
+            bits = torch.flip(bits, dims=[1]).flatten()[:INPUT_LEN]
 
-            # --- normalize each 116-bit segment ---
-            # segment 0: picker deck
+            # Normalize each 116-bit segment separately
             s0 = bits[:116]
             if s0.sum() > 0:
                 s0 = s0 / s0.sum()
-            # segment 1: opponent deck
             s1 = bits[116:232]
             if s1.sum() > 0:
                 s1 = s1 / s1.sum()
-            # segment 2: pool
             s2 = bits[232:348]
             if s2.sum() > 0:
                 s2 = s2 / s2.sum()
-            # draft step one-hot (348:357)
             s3 = bits[348:357]
 
             normalized_bits = torch.cat([s0, s1, s2, s3], dim=0)
             inputs.append(normalized_bits)
-            scores.append(float(score)/SCALE)
 
-        # stack and move to device
+            # Center and scale score to roughly [-1, 1]
+            score_norm = (float(score)/SCALE - mean_score) / (std_score + 1e-6)
+            scores.append(score_norm)
+
         self.inputs = torch.stack(inputs).to(device)
         self.scores = torch.tensor(scores, dtype=torch.float32, device=device)
 
@@ -71,39 +71,39 @@ class StateValueDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.inputs[idx], self.scores[idx]
+
 # -----------------------
-# Model (value network)
+# Structured ValueNet
 # -----------------------
 class ValueNet(nn.Module):
     def __init__(self, input_size=INPUT_LEN, dropout=DROPOUT):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_size, 1024),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.LayerNorm(1024),
             nn.Dropout(dropout),
 
             nn.Linear(1024, 512),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.LayerNorm(512),
             nn.Dropout(dropout),
 
             nn.Linear(512, 256),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.LayerNorm(256),
             nn.Dropout(dropout),
 
             nn.Linear(256, 64),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.LayerNorm(64),
             nn.Dropout(dropout),
 
-            nn.Linear(64, 1)
+            nn.Linear(64, 1)  # regression output
         )
 
     def forward(self, x):
         return self.net(x).squeeze(-1)
-
 
 # -----------------------
 # Training loop
