@@ -115,8 +115,6 @@ def play_against_human():
                     print("Invalid card. Try again.")
             else:
                 # AI turn
-                # AI turn
-# AI turn
                 if pick_i == pick_count - 1:
                     # Compute worst-case scores for each candidate
                     scores_dict = {}
@@ -127,33 +125,25 @@ def play_against_human():
                             my_next_deck = deck + [card]
                             opp_next_deck = other_deck + [opp_card]
                             pool_after_opp = [c for c in remaining_pool if c != opp_card]
-
                             candidate_cards, vals = pick_scores(opp_next_deck, my_next_deck, pool_after_opp, cumulative_pick - 1)
                             score = max(vals) if vals else 0.0
                             if score < worst_case_score:
                                 worst_case_score = score
                         scores_dict[card] = worst_case_score
 
-                    # Sort cards by worst-case score ascending
                     sorted_cards = sorted(scores_dict.items(), key=lambda x: x[1])
-
-                    # Print grid
                     print("Candidate cards (best-case against human) sorted best→worst:")
                     row_len = 4
                     for i in range(0, len(sorted_cards), row_len):
                         row = sorted_cards[i:i+row_len]
                         print("  " + " | ".join(f"{c}:{s:.4f}" for c, s in row))
 
-                    # Pick the best card (lowest worst-case score)
                     selected, best_score = sorted_cards[0]
                     print(f"Turn {cumulative_pick}, AI picked: {selected} (score: {best_score:.4f})")
-
                 else:
-                    # Regular greedy pick
                     candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
                     selected = candidate_cards[scores.index(max(scores))]
                     print(f"Turn {cumulative_pick}, AI picked: {selected}")
-
 
             deck.append(selected)
             pool.remove(selected)
@@ -165,5 +155,45 @@ def play_against_human():
     print("AI   :", ai)
 
 # -----------------------
+# Play against itself (AI vs AI)
+# -----------------------
+def play_against_itself():
+    board = Board()
+    pool = board.board.copy()
+    ai1, ai2 = [], []
+    cumulative_pick = 8
+
+    print("\n=== AI vs AI Draft ===")
+
+    for turn_idx, pick_count in enumerate(draftorder):
+        is_ai1_turn = (turn_idx % 2 == 0)
+        deck = ai1 if is_ai1_turn else ai2
+        other_deck = ai2 if is_ai1_turn else ai1
+        current_ai = "AI1" if is_ai1_turn else "AI2"
+
+        for pick_i in range(pick_count):
+            if not pool:
+                break
+
+            # Mix greedy and minimax for variety
+            if pick_i == pick_count - 1:
+                selected, scores_dict = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
+                print(f"Turn {cumulative_pick}, {current_ai} (minimax) picked: {selected}")
+            else:
+                candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
+                selected = candidate_cards[scores.index(max(scores))]
+                print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
+
+            deck.append(selected)
+            pool.remove(selected)
+
+        cumulative_pick -= 1
+
+    print("\nFinal decks:")
+    print("AI1:", ai1)
+    print("AI2:", ai2)
+
+# -----------------------
 if __name__ == "__main__":
-    play_against_human()
+    # play_against_human()
+    play_against_itself()
