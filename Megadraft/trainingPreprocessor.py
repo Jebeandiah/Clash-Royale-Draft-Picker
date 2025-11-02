@@ -106,7 +106,8 @@ def states_from_battle(battle, bcid, idtocat):
         cs.player_deck().append(cs.pool.pop())
         return
     def unpick_card():
-        states.append(copy.deepcopy(cs))
+        if cs.score>0:
+            states.append(copy.deepcopy(cs))
 
         card= cs.player_deck().pop()
         cs.pool.append(card)

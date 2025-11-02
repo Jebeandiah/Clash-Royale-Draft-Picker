@@ -176,13 +176,17 @@ def play_against_itself():
                 break
 
             # Mix greedy and minimax for variety
-            if pick_i == pick_count - 1:
-                selected, scores_dict = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
-                print(f"Turn {cumulative_pick}, {current_ai} (minimax) picked: {selected}")
-            else:
-                candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
-                selected = candidate_cards[scores.index(max(scores))]
-                print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
+            # if pick_i == pick_count - 1:
+            #     selected, scores_dict = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
+            #     print(f"Turn {cumulative_pick}, {current_ai} (minimax) picked: {selected}")
+            # else:
+            #     candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
+            #     selected = candidate_cards[scores.index(max(scores))]
+            #     print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
+           
+            candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
+            selected = candidate_cards[scores.index(max(scores))]
+            print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
 
             deck.append(selected)
             pool.remove(selected)
