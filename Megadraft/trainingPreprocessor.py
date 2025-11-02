@@ -110,7 +110,8 @@ def states_from_battle(battle, bcid, idtocat):
         card= cs.player_deck().pop()
         cs.pool.append(card)
         cs.nextpick = card
-        states.append(copy.deepcopy(cs))
+        if cs.score>0:
+            states.append(copy.deepcopy(cs))
         return
     cs.decks =[battle["player_deck"]]+[battle["opp_deck"]]
     cs.score = battle["low_tower_dif"]
