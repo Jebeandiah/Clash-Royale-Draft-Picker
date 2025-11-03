@@ -1,9 +1,8 @@
 import torch
 from boardGenerator import Board, card_list
-import testmodel
+import testmodel  # your file that defines StructuredValueNet
 
 MODEL_PATH = "value_net_best.pth"
-INPUT_LEN = 357
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]
@@ -11,78 +10,93 @@ draftorder = [1, 2, 2, 2, 2, 2, 2, 2, 1]
 # -----------------------
 # Load model
 # -----------------------
-model = testmodel.ValueNet().to(device)
+model = testmodel.StructuredValueNet().to(device)
 state = torch.load(MODEL_PATH, map_location=device)
 model.load_state_dict(state, strict=False)
 model.eval()
 
 # -----------------------
-# Encode state
+# Encode state (structured)
 # -----------------------
-def encode_state(picker_deck, other_deck, pool, draft_idx):
-    vec = torch.zeros(INPUT_LEN, dtype=torch.float32)
+def encode_state_structured(picker_deck, other_deck, pool, draft_idx):
+    picker_vec = torch.zeros(116, dtype=torch.float32)
+    other_vec = torch.zeros(116, dtype=torch.float32)
+    pool_vec = torch.zeros(116, dtype=torch.float32)
+    draft_vec = torch.zeros(9, dtype=torch.float32)
+
     for card in picker_deck:
         if card in card_list:
-            vec[card_list.index(card)] = 1.0
-    offset = 116
+            picker_vec[card_list.index(card)] = 1.0
     for card in other_deck:
         if card in card_list:
-            vec[offset + card_list.index(card)] = 1.0
-    offset = 232
+            other_vec[card_list.index(card)] = 1.0
     for card in pool:
         if card in card_list:
-            vec[offset + card_list.index(card)] = 1.0
-    offset = 348
+            pool_vec[card_list.index(card)] = 1.0
     if draft_idx < 9:
-        vec[offset + draft_idx] = 1.0
-    return vec.unsqueeze(0).to(device)
+        draft_vec[draft_idx] = 1.0
+
+    return (
+        picker_vec.unsqueeze(0).to(device),
+        other_vec.unsqueeze(0).to(device),
+        pool_vec.unsqueeze(0).to(device),
+        draft_vec.unsqueeze(0).to(device),
+    )
 
 # -----------------------
 # Evaluate all candidate picks
 # -----------------------
 def pick_scores(picker_deck, other_deck, pool, draft_idx):
-    states = []
+    all_picker, all_other, all_pool, all_draft = [], [], [], []
     candidate_cards = []
+
     for card in pool:
         pd = list(picker_deck) + [card]
         od = list(other_deck)
         p_copy = [c for c in pool if c != card]
-        s = encode_state(pd, od, p_copy, draft_idx)
-        states.append(s)
+
+        p_vec, o_vec, pool_vec, d_vec = encode_state_structured(pd, od, p_copy, draft_idx)
+        all_picker.append(p_vec)
+        all_other.append(o_vec)
+        all_pool.append(pool_vec)
+        all_draft.append(d_vec)
         candidate_cards.append(card)
 
-    if not states:
+    if not candidate_cards:
         return [], []
 
-    batch = torch.cat(states, dim=0)
+    picker_batch = torch.cat(all_picker, dim=0)
+    other_batch = torch.cat(all_other, dim=0)
+    pool_batch = torch.cat(all_pool, dim=0)
+    draft_batch = torch.cat(all_draft, dim=0)
+
     with torch.no_grad():
-        vals = model(batch)
-    return candidate_cards, vals.cpu().tolist()
+        vals = model(picker_batch, other_batch, pool_batch, draft_batch)
+
+    return candidate_cards, vals.squeeze(-1).cpu().tolist()
 
 # -----------------------
-# Minimax selection returning scores for all candidate cards
+# Minimax selection
 # -----------------------
 def pick_minimax_scores(deck, other_deck, pool, draft_idx):
     card_to_score = {}
 
     for my_card in pool:
         remaining_pool = [c for c in pool if c != my_card]
-        worst_case_score = float('inf')
+        worst_case_score = float("inf")
 
-        # simulate all possible opponent picks
         for opp_card in remaining_pool:
-            my_next_deck = deck + [my_card]
-            opp_next_deck = other_deck + [opp_card]
+            my_next = deck + [my_card]
+            opp_next = other_deck + [opp_card]
             pool_after_opp = [c for c in remaining_pool if c != opp_card]
 
-            candidate_cards, vals = pick_scores(opp_next_deck, my_next_deck, pool_after_opp, draft_idx - 1)
+            candidate_cards, vals = pick_scores(opp_next, my_next, pool_after_opp, draft_idx - 1)
             score = max(vals) if vals else 0.0
             if score < worst_case_score:
                 worst_case_score = score
 
         card_to_score[my_card] = worst_case_score
 
-    # Pick card with minimal worst-case score
     best_card = min(card_to_score, key=card_to_score.get)
     return best_card, card_to_score
 
@@ -114,32 +128,9 @@ def play_against_human():
                         break
                     print("Invalid card. Try again.")
             else:
-                # AI turn
                 if pick_i == pick_count - 1:
-                    # Compute worst-case scores for each candidate
-                    scores_dict = {}
-                    for card in pool:
-                        remaining_pool = [c for c in pool if c != card]
-                        worst_case_score = float('inf')
-                        for opp_card in remaining_pool:
-                            my_next_deck = deck + [card]
-                            opp_next_deck = other_deck + [opp_card]
-                            pool_after_opp = [c for c in remaining_pool if c != opp_card]
-                            candidate_cards, vals = pick_scores(opp_next_deck, my_next_deck, pool_after_opp, cumulative_pick - 1)
-                            score = max(vals) if vals else 0.0
-                            if score < worst_case_score:
-                                worst_case_score = score
-                        scores_dict[card] = worst_case_score
-
-                    sorted_cards = sorted(scores_dict.items(), key=lambda x: x[1])
-                    print("Candidate cards (best-case against human) sorted best→worst:")
-                    row_len = 4
-                    for i in range(0, len(sorted_cards), row_len):
-                        row = sorted_cards[i:i+row_len]
-                        print("  " + " | ".join(f"{c}:{s:.4f}" for c, s in row))
-
-                    selected, best_score = sorted_cards[0]
-                    print(f"Turn {cumulative_pick}, AI picked: {selected} (score: {best_score:.4f})")
+                    selected, scores_dict = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
+                    print(f"Turn {cumulative_pick}, AI picked: {selected}")
                 else:
                     candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
                     selected = candidate_cards[scores.index(max(scores))]
@@ -155,7 +146,7 @@ def play_against_human():
     print("AI   :", ai)
 
 # -----------------------
-# Play against itself (AI vs AI)
+# AI vs AI
 # -----------------------
 def play_against_itself():
     board = Board()
@@ -175,18 +166,13 @@ def play_against_itself():
             if not pool:
                 break
 
-            # Mix greedy and minimax for variety
-            # if pick_i == pick_count - 1:
-            #     selected, scores_dict = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
-            #     print(f"Turn {cumulative_pick}, {current_ai} (minimax) picked: {selected}")
-            # else:
-            #     candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
-            #     selected = candidate_cards[scores.index(max(scores))]
-            #     print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
-           
-            candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
-            selected = candidate_cards[scores.index(max(scores))]
-            print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
+            if pick_i == pick_count - 1:
+                selected, _ = pick_minimax_scores(deck, other_deck, pool, cumulative_pick)
+                print(f"Turn {cumulative_pick}, {current_ai} (minimax) picked: {selected}")
+            else:
+                candidate_cards, scores = pick_scores(deck, other_deck, pool, cumulative_pick)
+                selected = candidate_cards[scores.index(max(scores))]
+                print(f"Turn {cumulative_pick}, {current_ai} (greedy) picked: {selected}")
 
             deck.append(selected)
             pool.remove(selected)

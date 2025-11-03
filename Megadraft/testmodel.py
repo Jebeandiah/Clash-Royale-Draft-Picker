@@ -11,7 +11,7 @@ DB_NAME = "testdb.db"
 INPUT_LEN = 357
 BATCH_SIZE = 256
 NUM_WORKERS = 0
-EPOCHS = 150
+EPOCHS = 300
 LR = 1e-3
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
@@ -75,35 +75,49 @@ class StateValueDataset(Dataset):
 # -----------------------
 # Structured ValueNet
 # -----------------------
-class ValueNet(nn.Module):
-    def __init__(self, input_size=INPUT_LEN, dropout=DROPOUT):
+class VectorEncoder(nn.Module):
+    """Encodes one 116-bit vector into a latent feature."""
+    def __init__(self, in_dim=116, hidden_dim=128, out_dim=64, dropout=0.25):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_size, 1024),
+        self.layers = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
             nn.LeakyReLU(0.1),
-            nn.LayerNorm(1024),
             nn.Dropout(dropout),
-
-            nn.Linear(1024, 512),
+            nn.Linear(hidden_dim, out_dim),
             nn.LeakyReLU(0.1),
-            nn.LayerNorm(512),
             nn.Dropout(dropout),
-
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.1),
-            nn.LayerNorm(256),
-            nn.Dropout(dropout),
-
-            nn.Linear(256, 64),
-            nn.LeakyReLU(0.1),
-            nn.LayerNorm(64),
-            nn.Dropout(dropout),
-
-            nn.Linear(64, 1)  # regression output
         )
 
     def forward(self, x):
-        return self.net(x).squeeze(-1)
+        return self.layers(x)
+
+class StructuredValueNet(nn.Module):
+    def __init__(self, vec_dim=116, meta_dim=9, dropout=0.25):
+        super().__init__()
+        self.deck_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
+        self.pool_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
+        self.opp_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
+
+        fusion_in = 64*3 + meta_dim
+        self.fusion = nn.Sequential(
+            nn.Linear(fusion_in, 256),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout),
+            nn.Linear(128, 64),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout),
+            nn.Linear(64, 1)
+        )
+
+    def forward(self, deck_vec, pool_vec, opp_vec, meta_vec):
+        d = self.deck_encoder(deck_vec)
+        p = self.pool_encoder(pool_vec)
+        o = self.opp_encoder(opp_vec)
+        fused = torch.cat([d, o, p, meta_vec], dim=-1)
+        return self.fusion(fused).squeeze(-1)
 
 # -----------------------
 # Training loop
@@ -117,10 +131,10 @@ def train():
     n_train = len(dataset) - n_val
     train_set, val_set = random_split(dataset, [n_train, n_val])
 
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-    model = ValueNet().to(device)
+    model = StructuredValueNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-6)
     criterion = nn.MSELoss()
     scaler = torch.amp.GradScaler(enabled=True)
@@ -131,22 +145,35 @@ def train():
         train_loss = 0.0
         for inputs, targets in train_loader:
             optimizer.zero_grad()
+
+            # Split input into structured vectors
+            deck_vec = inputs[:, :116]
+            opp_vec = inputs[:, 116:232]
+            pool_vec = inputs[:, 232:348]
+            meta_vec = inputs[:, 348:357]
+
             with torch.amp.autocast(device_type='cuda'):
-                preds = model(inputs)
+                preds = model(deck_vec, pool_vec, opp_vec, meta_vec)
                 loss = criterion(preds, targets)
+
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             train_loss += loss.item() * inputs.size(0)
         train_loss /= len(train_loader.dataset)
 
-        # validation
+        # Validation
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
             for inputs, targets in val_loader:
+                deck_vec = inputs[:, :116]
+                opp_vec = inputs[:, 116:232]
+                pool_vec = inputs[:, 232:348]
+                meta_vec = inputs[:, 348:357]
+
                 with torch.amp.autocast(device_type='cuda'):
-                    preds = model(inputs)
+                    preds = model(deck_vec, pool_vec, opp_vec, meta_vec)
                     val_loss += criterion(preds, targets).item() * inputs.size(0)
         val_loss /= len(val_loader.dataset)
 
