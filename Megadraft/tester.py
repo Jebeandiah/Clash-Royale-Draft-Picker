@@ -19,27 +19,27 @@ model.eval()
 # Encode state (structured)
 # -----------------------
 def encode_state_structured(picker_deck, other_deck, pool, draft_idx):
-    picker_vec = torch.zeros(116, dtype=torch.float32)
-    other_vec = torch.zeros(116, dtype=torch.float32)
-    pool_vec = torch.zeros(116, dtype=torch.float32)
+    cards_vec = torch.zeros(116*3, dtype=torch.float32)
+    # other_vec = torch.zeros(116, dtype=torch.float32)
+    # pool_vec = torch.zeros(116, dtype=torch.float32)
     draft_vec = torch.zeros(9, dtype=torch.float32)
 
     for card in picker_deck:
         if card in card_list:
-            picker_vec[card_list.index(card)] = 1.0
+            cards_vec[card_list.index(card)] = 1.0
     for card in other_deck:
         if card in card_list:
-            other_vec[card_list.index(card)] = 1.0
+            cards_vec[card_list.index(card)+116] = 1.0
     for card in pool:
         if card in card_list:
-            pool_vec[card_list.index(card)] = 1.0
+            cards_vec[card_list.index(card)+232] = 1.0
     if draft_idx < 9:
         draft_vec[draft_idx] = 1.0
 
     return (
-        picker_vec.unsqueeze(0).to(device),
-        other_vec.unsqueeze(0).to(device),
-        pool_vec.unsqueeze(0).to(device),
+        cards_vec.unsqueeze(0).to(device),
+        # other_vec.unsqueeze(0).to(device),
+        # pool_vec.unsqueeze(0).to(device),
         draft_vec.unsqueeze(0).to(device),
     )
 
@@ -47,7 +47,7 @@ def encode_state_structured(picker_deck, other_deck, pool, draft_idx):
 # Evaluate all candidate picks
 # -----------------------
 def pick_scores(picker_deck, other_deck, pool, draft_idx):
-    all_picker, all_other, all_pool, all_draft = [], [], [], []
+    all_card, all_draft = [],  []
     candidate_cards = []
 
     for card in pool:
@@ -55,23 +55,24 @@ def pick_scores(picker_deck, other_deck, pool, draft_idx):
         od = list(other_deck)
         p_copy = [c for c in pool if c != card]
 
-        p_vec, o_vec, pool_vec, d_vec = encode_state_structured(pd, od, p_copy, draft_idx)
-        all_picker.append(p_vec)
-        all_other.append(o_vec)
-        all_pool.append(pool_vec)
+        c_vec,  d_vec = encode_state_structured(pd, od, p_copy, draft_idx)
+        all_card.append(c_vec)
+        # all_picker.append(p_vec)
+        # all_other.append(o_vec)
+        # all_pool.append(pool_vec)
         all_draft.append(d_vec)
         candidate_cards.append(card)
 
     if not candidate_cards:
         return [], []
 
-    picker_batch = torch.cat(all_picker, dim=0)
-    other_batch = torch.cat(all_other, dim=0)
-    pool_batch = torch.cat(all_pool, dim=0)
+    card_batch = torch.cat(all_card, dim=0)
+    # other_batch = torch.cat(all_other, dim=0)
+    # pool_batch = torch.cat(all_pool, dim=0)
     draft_batch = torch.cat(all_draft, dim=0)
 
     with torch.no_grad():
-        vals = model(picker_batch, other_batch, pool_batch, draft_batch)
+        vals = model(card_batch,  draft_batch)
 
     return candidate_cards, vals.squeeze(-1).cpu().tolist()
 

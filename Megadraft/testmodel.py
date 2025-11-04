@@ -83,7 +83,13 @@ class VectorEncoder(nn.Module):
             nn.Linear(in_dim, hidden_dim),
             nn.LeakyReLU(0.1),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, out_dim),
+            nn.Linear(hidden_dim, hidden_dim//2),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout),
+            #  nn.Linear(hidden_dim//4, hidden_dim//8),
+            # nn.LeakyReLU(0.1),
+            # nn.Dropout(dropout),
+            nn.Linear(hidden_dim//2, out_dim),
             nn.LeakyReLU(0.1),
             nn.Dropout(dropout),
         )
@@ -94,11 +100,11 @@ class VectorEncoder(nn.Module):
 class StructuredValueNet(nn.Module):
     def __init__(self, vec_dim=116, meta_dim=9, dropout=0.25):
         super().__init__()
-        self.deck_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
-        self.pool_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
-        self.opp_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
+        self.cards_encoder = VectorEncoder(3*vec_dim, 2048, 512, dropout)
+        # self.pool_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
+        # self.opp_encoder = VectorEncoder(vec_dim, 256, 64, dropout)
 
-        fusion_in = 64*3 + meta_dim
+        fusion_in = 512 + meta_dim
         self.fusion = nn.Sequential(
             nn.Linear(fusion_in, 256),
             nn.LeakyReLU(0.1),
@@ -112,11 +118,9 @@ class StructuredValueNet(nn.Module):
             nn.Linear(64, 1)
         )
 
-    def forward(self, deck_vec, pool_vec, opp_vec, meta_vec):
-        d = self.deck_encoder(deck_vec)
-        p = self.pool_encoder(pool_vec)
-        o = self.opp_encoder(opp_vec)
-        fused = torch.cat([d, o, p, meta_vec], dim=-1)
+    def forward(self, cards_vec,  meta_vec):
+        d = self.cards_encoder(cards_vec)
+        fused = torch.cat([d, meta_vec], dim=-1)
         return self.fusion(fused).squeeze(-1)
 
 # -----------------------
@@ -147,13 +151,13 @@ def train():
             optimizer.zero_grad()
 
             # Split input into structured vectors
-            deck_vec = inputs[:, :116]
-            opp_vec = inputs[:, 116:232]
-            pool_vec = inputs[:, 232:348]
+            cards_vec = inputs[:, :348]
+            # opp_vec = inputs[:, 116:232]
+            # pool_vec = inputs[:, 232:348]
             meta_vec = inputs[:, 348:357]
 
             with torch.amp.autocast(device_type='cuda'):
-                preds = model(deck_vec, pool_vec, opp_vec, meta_vec)
+                preds = model(cards_vec, meta_vec)
                 loss = criterion(preds, targets)
 
             scaler.scale(loss).backward()
@@ -167,13 +171,13 @@ def train():
         val_loss = 0.0
         with torch.no_grad():
             for inputs, targets in val_loader:
-                deck_vec = inputs[:, :116]
-                opp_vec = inputs[:, 116:232]
-                pool_vec = inputs[:, 232:348]
+                cards_vec = inputs[:, :348]
+                # opp_vec = inputs[:, 116:232]
+                # pool_vec = inputs[:, 232:348]
                 meta_vec = inputs[:, 348:357]
 
                 with torch.amp.autocast(device_type='cuda'):
-                    preds = model(deck_vec, pool_vec, opp_vec, meta_vec)
+                    preds = model(cards_vec, meta_vec)
                     val_loss += criterion(preds, targets).item() * inputs.size(0)
         val_loss /= len(val_loader.dataset)
 
