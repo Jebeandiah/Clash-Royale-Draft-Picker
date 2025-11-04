@@ -68,7 +68,8 @@ def extract_battle_data(battle):
 
     tdeck = [bg.card_str_to_id(c["name"]) for c in team.get("cards", [])]
     odeck = [bg.card_str_to_id(c["name"]) for c in opp.get("cards", [])]
-
+    # print(team.get("cards", []))
+    # print(opp.get("cards", []))
     winner = team if team["crowns"] > opp["crowns"] else opp
     wtower_healths = (winner.get("princessTowersHitPoints") or []) + [winner.get("kingTowerHitPoints", 0)]   
      # print([winner["kingTowerHitPoints"]])
@@ -77,10 +78,13 @@ def extract_battle_data(battle):
     for i in range(abs(team["crowns"] - opp["crowns"])):
         wlowtowerhealth+=min(wtower_healths)
         wtower_healths.remove(min(wtower_healths))
+    if winner != team:
+        wlowtowerhealth*=-1
     #wlowtowhealth = min([hp for hp in wtower_healths if hp != 0], default=0)
     battle_id = f"{team["tag"]}_{battle["battleTime"]}"
     # print(battle_id)
-    return (battle_id, team["crowns"], opp["crowns"], wlowtowerhealth, str(tdeck), str(odeck))
+
+    return (battle_id,  wlowtowerhealth, str(tdeck), str(odeck))
 
 # def write_battle_data(battle, player_tag, db):
 #     team = battle["team"][0]
@@ -111,7 +115,7 @@ class RateLimiter:
 
 # --- MAIN SCRAPER ---
 
-async def collect_megadraft_from_top_clans(top_n_clans=5, dbname=dBManager.dbname):
+async def collect_megadraft_from_top_clans(top_n_clans=10, dbname=dBManager.dbname):
     rate_limiter = RateLimiter(REQUESTS_PER_SECOND)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     con = sqlite3.connect(f'{dbname}.db')
@@ -144,10 +148,11 @@ async def collect_megadraft_from_top_clans(top_n_clans=5, dbname=dBManager.dbnam
                         row = extract_battle_data(b)
                         cur.execute("""
                             INSERT OR IGNORE INTO battles 
-                            (battle_id, player_crowns, opp_crowns, winner_low_tower, player_deck, opp_deck)
-                            VALUES (?,?, ?, ?, ?, ?)
+                            (battle_id,  low_tower_dif, player_deck, opp_deck)
+                            VALUES (?,  ?, ?, ?)
                         """, row)
                         con.commit()
+
                         # writer.writerow(row)
                         count += 1
                 print(f"🔹 [{idx+1}/{len(all_players)}] {player_tag}: {count} Mega Draft matches")
@@ -165,4 +170,4 @@ import ast  # for safely converting string representation of lists back to Pytho
 if __name__ == "__main__":
 
     # reset_db("testdb")
-    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=50))
+    asyncio.run(collect_megadraft_from_top_clans(top_n_clans=600))
