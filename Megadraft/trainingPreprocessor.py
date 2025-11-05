@@ -311,7 +311,12 @@ def debug_training_states(dbname=dBManager.dbname, limit=None):
         print("Score            :", score)
         print("----------------\n")
 if __name__ == "__main__":
-    collect_states()
+    idtc, cartocat = generate_card_refs()
+    retstr = ""
+    for name in bg.all_cards:
+        retstr+=f"card(\"{name}\", {cartocat[bg.card_list.index(name)]}, 0),\n"
+    print(retstr)
+        # collect_states()
     # print(read_training_data())
     # debug_training_states()
     pls = "noerror"
