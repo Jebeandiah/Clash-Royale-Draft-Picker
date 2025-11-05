@@ -25,8 +25,7 @@ def format_db(dbname):
     cursor.execute('''
         CREATE TABLE training (
             input BLOB NOT NULL,
-            next_card int NOT NULL,
-            score int NOT NULL
+            score float NOT NULL
         )
     ''')
     con.commit()
@@ -84,8 +83,7 @@ if __name__ == "__main__":
     cursor.execute('''
         CREATE TABLE training (
             input BLOB NOT NULL,
-            next_card int NOT NULL,
-            score int NOT NULL
+            score float NOT NULL
         )
     ''')
     con.commit()
@@ -94,5 +92,5 @@ if __name__ == "__main__":
     con.execute("VACUUM")
     
     con.close()
-    print(read_battles())
+    # print(read_battles())
     pls = "stop"

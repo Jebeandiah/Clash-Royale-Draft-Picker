@@ -8,10 +8,10 @@ PLAYER_TAG = "#8VCGL2UJ2"  # any valid tag
 URL = f"https://api.clashroyale.com/v1/players/{PLAYER_TAG.replace('#', '%23')}"
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
-MAX_TOTAL_REQUESTS = 200  # max requests to attempt
+MAX_TOTAL_REQUESTS = 2000  # max requests to attempt
 INITIAL_CONCURRENT = 1     # start with 1 concurrent request
 STEP_CONCURRENT = 2        # increase by this step
-MAX_CONCURRENT = 50        # safety stop
+MAX_CONCURRENT = 6        # safety stop
 
 async def fetch(session, idx):
     """Send one request and return the status"""
