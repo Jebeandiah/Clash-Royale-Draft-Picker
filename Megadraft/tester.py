@@ -16,7 +16,7 @@ def deck_to_vector(deck):
     deck: list of card names, e.g. ['Archer', 'Giant', ...]
     Returns: torch tensor of shape [len(ch.card_list)*2]
     """
-    vec = torch.zeros(len(ch.card_list), dtype=torch.float32)
+    vec = torch.zeros(len(ch.card_list), dtype=torch.float32, device=DEVICE)
     for card in deck:
         idx = ch.name_to_id[card.lower()]
         vec[idx] = 1.0  # your first 8-card deck
@@ -33,25 +33,20 @@ model.eval()
 # Scoring function
 # -----------------------
 def score_matchup(deck1, deck2):
-    """
-    deck1, deck2: list of card names
-    Returns: predicted score difference (deck1 vs deck2)
-    """
-    vec1 = deck_to_vector(deck1)
-    vec2 = deck_to_vector(deck2)
-    input_vec = torch.cat([vec1, vec2]).unsqueeze(0).to(DEVICE)  # shape [1, 2*len(card_list)]
+    vec1 = deck_to_vector(deck1).unsqueeze(0)  # [1, num_cards]
+    vec2 = deck_to_vector(deck2).unsqueeze(0)  # [1, num_cards]
     with torch.no_grad():
-        score = model(input_vec)
+        score = model(vec1, vec2)
     return score.item()
 
 # -----------------------
 # Example usage
 # -----------------------
 if __name__ == "__main__":
-    deck_a = ['arrows', 'cannon', 'balloon', 'valkyrie', 'rocket', 'Zap', 'skeletons', 'mini p.e.k.k.a']
-    # deck_b = ['goblins', 'skeleton army', 'goblin gang', 'Skeletons', 'Fire Spirit', 'guards', 'Arrows', 'Valkyrie']
+    deck_a = ['the log', 'cannon', 'fire spirit', 'valkyrie', 'hog rider', 'tesla', 'skeletons', 'mini p.e.k.k.a']
+    deck_b = ['goblins', 'skeleton army', 'goblin gang', 'Skeletons', 'Fire Spirit', 'guards', 'Arrows', 'Valkyrie']
     # deck_b = ['hog rider', 'Cannon', 'Ice Spirit', 'Skeletons', 'Fire Spirit', 'Mini P.E.K.K.A', 'Arrows', 'Valkyrie']
-    deck_b = ['arrows', 'tesla', 'hog rider', 'tornado', 'hunter', 'Zap', 'skeletons', 'mini p.e.k.k.a']
+    # deck_b = ['arrows', 'ice spirit', 'hog rider', 'the log', 'hunter', 'earthquake', 'skeletons', 'mini p.e.k.k.a']
     scorea = score_matchup(deck_a, deck_b)
     scoreb= score_matchup(deck_b, deck_a)
     # result = score_matchup(deck_a, deck_b)-score_matchup(deck_b, deck_a)
