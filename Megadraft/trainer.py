@@ -12,8 +12,8 @@ DB_NAME = "testdb.db"
 INPUT_LEN = len(ch.card_list)*2
 BATCH_SIZE = 256
 NUM_WORKERS = 0
-EPOCHS = 300
-LR = 3e-4
+EPOCHS = 500
+LR = 1e-3
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
@@ -55,16 +55,17 @@ class DeckEncoder(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(input_len, hidden),
             # nn.BatchNorm1d(hidden),
-            nn.Tanh(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden, hidden//4),
             # nn.BatchNorm1d(embed_dim),
             nn.Tanh(),
             nn.Dropout(dropout),
             nn.Linear(hidden//4, embed_dim),
-            # nn.BatchNorm1d(embed_dim),
-            nn.Tanh(),
+            nn.BatchNorm1d(embed_dim),
+            # nn.GELU(),
             nn.Dropout(dropout)
+
         )
 
     def forward(self, x):
@@ -80,12 +81,12 @@ class ValueNet(nn.Module):
 
              nn.Linear(128, 256),
             # nn.BatchNorm1d(1024),
-            nn.Tanh(),
+            nn.GELU(),
             nn.Dropout(dropout),
 
             nn.Linear(256, 128),
             # nn.BatchNorm1d(256),
-            nn.Tanh(),
+            nn.GELU(),
             nn.Dropout(dropout),
 
             # nn.Linear(512, 256),
@@ -98,11 +99,11 @@ class ValueNet(nn.Module):
             # nn.Dropout(dropout),
             nn.Linear(128, 64),
             # nn.BatchNorm1d(64),
-            nn.Tanh(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(64, 32),
             # nn.BatchNorm1d(64),
-            nn.Tanh(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(32, 1),
             nn.Tanh()
