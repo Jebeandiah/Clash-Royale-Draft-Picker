@@ -28,6 +28,16 @@ def format_db(dbname):
             score float NOT NULL
         )
     ''')
+    cursor.execute("DROP TABLE IF EXISTS found_clans")
+    
+    # Create the new table
+    cursor.execute('''
+        CREATE TABLE found_clans (
+             tag TEXT PRIMARY KEY,
+            status TEXT CHECK(status IN ('pending', 'processed')) DEFAULT 'pending'
+        )
+    ''')
+   
     con.commit()
     
     # Optional: shrink the database file to reclaim space
@@ -74,7 +84,7 @@ def read_battles(dbname=dbname, limit=None):
 
 if __name__ == "__main__":
     # print(read_battles(dbname, 1)[0])
-    # format_db("testdb")
+    format_db("testdb")
     con = sqlite3.connect(f'{dbname}.db')
     cursor = con.cursor()
     cursor.execute("DROP TABLE IF EXISTS training")

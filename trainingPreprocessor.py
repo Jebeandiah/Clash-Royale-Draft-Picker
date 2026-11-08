@@ -100,7 +100,7 @@ def read_training_data(dbname=dBManager.dbname, limit=None):
 
 if __name__ == "__main__":
     
-    # collect_decks()
+    collect_decks()
     inputs, scores = read_training_data()
     # print(inputs[0])
     print(len(scores))

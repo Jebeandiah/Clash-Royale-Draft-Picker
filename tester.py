@@ -43,8 +43,8 @@ def score_matchup(deck1, deck2):
 # Example usage
 # -----------------------
 if __name__ == "__main__":
-    deck_a = ['the log', 'cannon', 'goblin barrel', 'goblin gang', 'princess', 'dart goblin', 'skeletons', 'arrows']
-    deck_b = ['goblins', 'tornado', 'goblin gang', 'hog rider', 'arrows', 'guards', 'the log', 'Valkyrie']
+    deck_a = ['royal ghost', 'valkyrie', 'mega minion', 'mini p.e.k.k.a', 'zap', 'inferno tower', 'goblin drill', 'barbarian barrel']
+    deck_b = ['valkyrie', 'lumberjack', 'balloon', 'inferno tower', 'arrows', 'skeleton army', 'freeze', 'bats']
     # deck_b = ['hog rider', 'Cannon', 'Ice Spirit', 'Skeletons', 'Fire Spirit', 'Mini P.E.K.K.A', 'Arrows', 'Valkyrie']
     # deck_b = ['arrows', 'ice spirit', 'hog rider', 'the log', 'hunter', 'earthquake', 'skeletons', 'mini p.e.k.k.a']
     scorea = score_matchup(deck_a, deck_b)
