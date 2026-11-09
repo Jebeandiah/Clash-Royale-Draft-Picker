@@ -6,6 +6,27 @@ from urllib.parse import quote
 import sqlite3
 import dBManager
 import cardhelpers as ch
+def load_env_file(filepath=".env"):
+    try:
+        with open(filepath, "r") as f:
+            for line in f:
+                # Strip whitespace and skip empty lines or comments
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                
+                # Split on the first '=' sign
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    # Remove potential surrounding whitespace or quotes
+                    key = key.strip()
+                    value = value.strip().strip("'").strip('"')
+                    os.environ[key] = value
+    except FileNotFoundError:
+        print(f"Warning: {filepath} file not found.")
+
+# Load variables into os.environ
+load_env_file()
 
 API_TOKEN = os.getenv("CR_API_KEY")
 HEADERS = {"Accept": "application/json", "Authorization": f"Bearer {API_TOKEN}"}
@@ -14,7 +35,7 @@ MAX_CONCURRENT_REQUESTS = 8
 REQUESTS_PER_SECOND = 100
 DBNAME = dBManager.dbname
 BATCH_COMMIT_SIZE = 25
-TOTAL_BATTLE_LIMIT = 1000000
+TOTAL_BATTLE_LIMIT = 100000
 MAX_PENDING_CLANS = 10_000
 
 # --- RATE LIMITER ---
@@ -185,6 +206,7 @@ async def worker(name, session, rate_limiter, con, battle_counter, counter_lock,
 
 # --- MAIN ---
 async def crawl_from_top_clan():
+    # print("key is", API_TOKEN)
     con = sqlite3.connect(f"{DBNAME}.db")
     con.row_factory = sqlite3.Row
     rate_limiter = RateLimiter(REQUESTS_PER_SECOND)

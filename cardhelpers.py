@@ -14,6 +14,7 @@ class Card:
         return print_string
      
 card_list=[
+Card("ronin", ['anti_tank', 'mini_tank'], 5),
 Card("royal delivery", ['damage_spell'], 3),
 Card("hunter", ['anti_air', 'anti_tank'], 4),
 Card("prince", ['mini_tank'], 5),
