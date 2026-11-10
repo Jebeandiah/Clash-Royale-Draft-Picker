@@ -1,22 +1,22 @@
 
 
 class Card:
-     def __init__(self, name, categories, elixer):
+     def __init__(self, name, categories, elixir):
         self.name = name
         self.categories = categories
-        self.elixer = elixer
+        self.elixir = elixir
         # self.id = 0
 
      def __str__(self):
         
-        print_string = f"Card({self.name}, {self.categories}, {self.elixer})"
+        print_string = f"Card({self.name}, {self.categories}, {self.elixir})"
 
         return print_string
      
 card_list=[
 Card("ronin", ['anti_tank', 'mini_tank'], 5),
 Card("royal delivery", ['damage_spell'], 3),
-Card("hunter", ['anti_air', 'anti_tank'], 4),
+Card("hunter", [ 'anti_tank', 'anti_air'], 4),
 Card("prince", ['mini_tank'], 5),
 Card("goblin hut", ['building'], 5),
 Card("bats", ['anti_air'], 2),
@@ -33,12 +33,12 @@ Card("three musketeers", ['win_condition'], 9),
 Card("skeleton barrel", ['win_condition'], 3),
 Card("valkyrie", ['tank', 'mini_tank'], 4),
 Card("goblinstein", ['champion'], 5),
-Card("goblin giant", ['tank', 'win_condition'], 6),
+Card("goblin giant", ['win_condition', 'tank'], 6),
 Card("tombstone", ['building'], 3),
 Card("mortar", ['building'], 4),
 Card("lightning", ['damage_spell', 'second_spell'], 6),
 Card("wizard", ['anti_air'], 5),
-Card("goblin drill", ['tank', 'win_condition'], 4),
+Card("goblin drill", [ 'win_condition','tank'], 4),
 Card("mega minion", ['anti_air'], 3),
 Card("hog rider", ['win_condition'], 4),
 Card("berserker", ['distraction', 'mini_tank'], 2),
@@ -46,29 +46,29 @@ Card("giant skeleton", ['tank'], 6),
 Card("fisherman", ['mini_tank'], 3),
 Card("barbarian hut", ['building'], 6),
 Card("mighty miner", ['champion'], 4),
-Card("tesla", ['anti_tank', 'building'], 4),
+Card("tesla", [ 'building', 'anti_tank'], 4),
 Card("executioner", ['anti_air'], 5),
-Card("bomb tower", ['anti_tank', 'building'], 4),
+Card("bomb tower", [ 'building', 'anti_tank'], 4),
 Card("goblin machine", ['tank', 'mini_tank'], 5),
 Card("monk", ['champion'], 5),
 Card("archers", ['anti_air'], 3),
 Card("electro wizard", ['anti_air'], 4),
 Card("minions", ['anti_air', 'distraction'], 3),
 Card("phoenix", ['anti_air'], 4),
-Card("royal giant", ['tank', 'win_condition'], 6),
+Card("royal giant", ['win_condition', 'tank' ], 6),
 Card("little prince", ['champion'], 3),
 Card("archer queen", ['champion'], 5),
-Card("miner", ['tank', 'win_condition', 'mini_tank'], 3),
+Card("miner", ['win_condition','tank', 'mini_tank'], 3),
 Card("sparky", ['anti_tank'], 6),
 Card("skeleton dragons", ['anti_air'], 4),
 Card("zappies", ['anti_air'], 4),
 Card("battle ram", ['win_condition'], 4),
-Card("goblin cage", ['mini_tank', 'anti_tank', 'building'], 4),
+Card("goblin cage", ['building', 'mini_tank', 'anti_tank' ], 4),
 Card("the log", ['damage_spell', 'second_spell'], 2),
 Card("ram rider", ['win_condition'], 5),
 Card("ice spirit", ['distraction'], 1),
-Card("inferno tower", ['anti_tank', 'building'], 5),
-Card("elixir golem", ['tank', 'win_condition'], 3),
+Card("inferno tower", ['building', 'anti_tank'], 5),
+Card("elixir golem", ['win_condition', 'tank'], 3),
 Card("void", ['damage_spell'], 3),
 Card("skeleton army", ['distraction'], 3),
 Card("boss bandit", ['champion'], 6),
@@ -79,7 +79,7 @@ Card("cannon cart", ['mini_tank', 'anti_tank'], 5),
 Card("firecracker", ['anti_air'], 3),
 Card("tornado", ['second_spell'], 3),
 Card("freeze", ['second_spell'], 4),
-Card("cannon", ['anti_tank', 'building'], 3),
+Card("cannon", ['building', 'anti_tank'], 3),
 Card("battle healer", ['mini_tank'], 4),
 Card("electro dragon", ['anti_air'], 5),
 Card("barbarian barrel", ['damage_spell', 'second_spell'], 2),
@@ -90,23 +90,23 @@ Card("balloon", ['win_condition'], 5),
 Card("goblin curse", ['damage_spell', 'second_spell'], 2),
 Card("magic archer", ['anti_air'], 4),
 Card("fire spirit", ['distraction'], 1),
-Card("mini p.e.k.k.a", ['mini_tank', 'anti_tank'], 4),
+Card("mini p.e.k.k.a", ['anti_tank', 'mini_tank'], 4),
 Card("x-bow", ['building'], 6),
-Card("giant", ['tank', 'win_condition'], 5),
+Card("giant", [ 'win_condition', 'tank'], 5),
 Card("royal ghost", ['mini_tank'], 3),
-Card("spear goblins", ['anti_air', 'distraction'], 2),
+Card("spear goblins", [ 'distraction', 'anti_air'], 2),
 Card("fireball", ['damage_spell', 'second_spell'], 4),
 Card("skeletons", ['distraction'], 1),
-Card("ice golem", ['tank', 'distraction'], 2),
+Card("ice golem", ['distraction', 'tank'], 2),
 Card("poison", ['damage_spell', 'second_spell'], 4),
-Card("rune giant", ['tank', 'win_condition'], 4),
+Card("rune giant", ['win_condition', 'tank'], 4),
 Card("heal spirit", ['distraction'], 1),
 Card("princess", ['anti_air'], 3),
 Card("bandit", ['mini_tank'], 3),
 Card("giant snowball", ['damage_spell', 'second_spell'], 2),
 Card("elite barbarians", ['anti_tank'], 6),
 Card("arrows", ['damage_spell', 'second_spell'], 3),
-Card("witch", ['anti_air', 'anti_tank'], 5),
+Card("witch", ['anti_tank','anti_air'], 5),
 Card("furnace", ['building'], 4),
 Card("musketeer", ['anti_air'], 4),
 Card("earthquake", ['damage_spell', 'second_spell'], 3),
@@ -131,11 +131,11 @@ Card("inferno dragon", ['anti_air', 'anti_tank'], 4),
 Card("electro spirit", ['distraction'], 1),
 Card("mother witch", ['anti_air'], 4),
 Card("golden knight", ['champion'], 4),
-Card("clone", ['none'], 3),
-Card("mirror", ['none'], 0),
-Card("spirit empress", ['none'], 6),
-Card("goblin demolisher", ['none'], 4),
-Card("vines", ['none'], 3),
+Card("clone", ['second_spell'], 3),
+Card("mirror", ['second_spell'], 0),
+Card("spirit empress", ['mini_tank'], 6),
+Card("goblin demolisher", ['mini_tank'], 4),
+Card("vines", ['second_spell'], 3),
 ]
 
 name_to_id = {}
@@ -160,6 +160,11 @@ for card in card_list:
         if category not in categorized_cards:
             categorized_cards[category] = []
         categorized_cards[category]+=[card]
-
+category_to_id = {}
+for i, category in enumerate(categorized_cards):
+    category_to_id[category] = i
 # print(categorized_cards)
 # print(len(card_list))
+# for category in categorized_cards:
+#     print(category)
+# print(category_to_id)

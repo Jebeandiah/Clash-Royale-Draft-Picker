@@ -5,11 +5,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import sqlite3
 import dBManager
 import cardhelpers as ch
-# -----------------------
-# Config
-# -----------------------
-DB_NAME = "testdb.db"
-INPUT_LEN = len(ch.card_list)*2
+
+HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.category_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
 BATCH_SIZE = 256
 NUM_WORKERS = 0
 EPOCHS = 500
@@ -22,13 +19,20 @@ def vectorize_deck(multi_hot):
    
     num_cards = len(ch.card_list)
     card_ids = torch.nonzero(multi_hot).flatten().tolist()
-    # Unpack bits from bytes
-    
-    return torch.cat([multi_hot, ])
+    cat_counts_norm = [0.0] * len(ch.category_to_id)
+    elixir_norm =0
+    for card_id in card_ids:
+        elixir_norm += (ch.card_list[card_id].elixir/5)/8 #5 is apprx max avg elxer used to normalize
+        cat_counts_norm[ch.category_to_id[ch.card_list[card_id].categories[0]]] += 1.0/8
+
+    feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + cat_counts_norm, dtype=torch.float32)])
+    return feature_vector
+
+
 
 class read_training_dataset(Dataset):
     
-    def __init__(self, db_name=dBManager.dbname, device=DEVICE):
+    def __init__(self, db_name=dBManager.DB_NAME, device=DEVICE):
         con = sqlite3.connect(f'{db_name}.db')
         cur = con.cursor()
         cur.execute("SELECT packed_decks, low_tower_dif FROM battles")
@@ -53,122 +57,120 @@ class read_training_dataset(Dataset):
             o_multi_hot = bits[num_cards:]
             p_vector = vectorize_deck(p_multi_hot)
             o_vector = vectorize_deck(o_multi_hot)
-
+            combined_vector = torch.cat([p_vector, o_vector])
             score = float(low_tower_dif) / 9156.0
-
-            # 2. Add Original Perspective (A vs B)
-            inputs.append(bits)
+            inputs.append(combined_vector)
             scores.append(score)
 
             # 3. Add Swapped Perspective (B vs A) for perfect symmetry
-            swapped_bits = torch.cat([bits[num_cards:], bits[:num_cards]])
+            swapped_bits = torch.cat([combined_vector[HALF_INPUT_LEN:], combined_vector[:HALF_INPUT_LEN]])
             inputs.append(swapped_bits)
             scores.append(-score)
 
         self.inputs = torch.stack(inputs).to(device)
         self.scores = torch.tensor(scores, dtype=torch.float32, device=device)
 
-        def __len__(self):
-            return self.inputs.size(0)
+    def __len__(self):
+        return self.inputs.size(0)
 
-        def __getitem__(self, idx):
-            return self.inputs[idx], self.scores[idx]
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.scores[idx]
 
-class DeckEncoder(nn.Module):
-    """Shared encoder that converts one deck vector into an embedding"""
-    def __init__(self, input_len, hidden=512, embed_dim=64, dropout=0.1):
+class ResidualBlock(nn.Module): 
+    """Residual Block with GELU, LayerNorm, and Dropout for stable deep learning."""
+    def __init__(self, dim, dropout=0.2):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_len, hidden),
-            # nn.BatchNorm1d(hidden),
+        self.block = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden, hidden//4),
-            # nn.BatchNorm1d(embed_dim),
-            nn.Tanh(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden//4, embed_dim),
-            nn.BatchNorm1d(embed_dim),
-            # nn.GELU(),
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim),
             nn.Dropout(dropout)
+        )
+        self.act = nn.GELU()
 
+    def forward(self, x):
+        return self.act(x + self.block(x))
+
+
+class OptimizedDeckEncoder(nn.Module):
+    """
+    Shared Siamese Encoder:
+    Expands input -> processes via Residual Blocks -> compresses into a latent embedding.
+    """
+    def __init__(self, input_len=HALF_INPUT_LEN, embed_dim=64, dropout=DROPOUT):
+        super().__init__()
+        
+        # 1. Feature Expansion Layer
+        self.input_projection = nn.Sequential(
+            nn.Linear(input_len, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(dropout)
+        )
+        
+        # 2. Deep Residual Processing Trunk
+        self.res_block1 = ResidualBlock(256, dropout=dropout)
+        self.res_block2 = ResidualBlock(256, dropout=dropout)
+        
+        # 3. Controlled Embedding Compression
+        self.compress = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.LayerNorm(128),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(128, embed_dim),
+            nn.LayerNorm(embed_dim)
         )
 
     def forward(self, x):
-        return self.net(x)
+        x = self.input_projection(x)
+        x = self.res_block1(x)
+        x = self.res_block2(x)
+        return self.compress(x)
 
-class ValueNet(nn.Module):
-    def __init__(self, dropout=0.1):
+
+class OptimizedValueNet(nn.Module):
+    """
+    Matchup Rating Head:
+    Computes vector difference (h_a - h_b) to enforce mathematically perfect anti-symmetry.
+    """
+    def __init__(self, input_len=HALF_INPUT_LEN, embed_dim=64, dropout=DROPOUT):
         super().__init__()
-        self.encoder = DeckEncoder(len(ch.card_list))
+        self.encoder = OptimizedDeckEncoder(input_len=input_len, embed_dim=embed_dim, dropout=dropout)
 
-        # combine embeddings: [a, b, |a-b|, a*b]
-        self.matchup_score = nn.Sequential(
-
-             nn.Linear(128, 256),
-            # nn.BatchNorm1d(1024),
-            nn.GELU(),
-            nn.Dropout(dropout),
-
-            nn.Linear(256, 128),
-            # nn.BatchNorm1d(256),
-            nn.GELU(),
-            nn.Dropout(dropout),
-
-            # nn.Linear(512, 256),
-            
-            # nn.LeakyReLU(0.1),
-            # nn.Dropout(dropout),
-            # nn.Linear(512, 256),
-            # # nn.BatchNorm1d(128),
-            # nn.LeakyReLU(0.1),
-            # nn.Dropout(dropout),
-            nn.Linear(128, 64),
-            # nn.BatchNorm1d(64),
+        # Takes 64-dim vector difference (h_a - h_b)
+        self.classifier = nn.Sequential(
+            nn.Linear(embed_dim, 64),
+            nn.LayerNorm(64),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(64, 32),
-            # nn.BatchNorm1d(64),
             nn.GELU(),
-            nn.Dropout(dropout),
             nn.Linear(32, 1),
             nn.Tanh()
         )
 
     def forward(self, player_deck, opp_deck):
+        # Pass both decks through identical shared encoder weights
+        h_a = self.encoder(player_deck)
+        h_b = self.encoder(opp_deck)
 
-        a_embed = self.encoder(player_deck)
-        b_embed = self.encoder(opp_deck)
+        # Vector difference guarantees model(A, B) == -model(B, A)
+        diff = h_a - h_b
+        return self.classifier(diff).squeeze(-1)
 
-        # combine features
-        combined = torch.cat([a_embed, b_embed], dim=1)
-
-        return self.matchup_score(combined).squeeze(-1)
 
 # -----------------------
-# Training loop
+# Training Loop
 # -----------------------
-def sign_agreement_loss(preds, targets):
-    # same-sign mask: 1 where sign matches, 0 where not
-    same_sign = (preds * targets) > 0
-    # normal MSE but only for mismatched signs
-    mse = (preds - targets) ** 2
-    # zero out losses for matching signs
-    loss = torch.where(same_sign, torch.zeros_like(mse), mse)
-    return loss.mean()
 def train():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Device:", device)
+    device = torch.device(DEVICE)
+    print("Training Device:", device)
 
-    dataset = read_training_dataset()
-
-    # --- Print first entry for inspection ---
-    # first_input, first_score = dataset[0]
-    # print("First input vector (bits):", first_input)
-    # print("First score:", first_score)
-    # print("Sum of bits in first input:", first_input.sum().item())
-    # print("Length of input vector:", len(first_input))
-    # print("--- End of first entry ---")
+    dataset = read_training_dataset(db_name=dBManager.DB_NAME, device=device)
 
     n_val = int(len(dataset) * VAL_SPLIT)
     n_train = len(dataset) - n_val
@@ -177,51 +179,62 @@ def train():
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-    model = ValueNet().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-6)
+    model = OptimizedValueNet(input_len=HALF_INPUT_LEN, dropout=DROPOUT).to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
     criterion = nn.MSELoss()
-    scaler = torch.amp.GradScaler(enabled=True)
+    
+    # Cosine annealing learning rate scheduler for smooth convergence
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
+
+    use_amp = (device.type == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     best_val = float("inf")
-    for epoch in range(1, EPOCHS+1):
+    
+    for epoch in range(1, EPOCHS + 1):
         model.train()
         train_loss = 0.0
+
         for inputs, targets in train_loader:
             optimizer.zero_grad()
-            with torch.amp.autocast(device_type='cuda'):
-                player_deck = inputs[:, :121]
-                opp_deck = inputs[:, 121:242]
+
+            with torch.amp.autocast(device_type=device.type, enabled=use_amp):
+                player_deck = inputs[:, :HALF_INPUT_LEN]
+                opp_deck = inputs[:, HALF_INPUT_LEN:]
                 preds = model(player_deck, opp_deck)
                 loss = criterion(preds, targets)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            train_loss += loss.item() * inputs.size(0)
-        train_loss /= len(train_loader.dataset)
 
-        # Validation
+            train_loss += loss.item() * inputs.size(0)
+
+        train_loss /= len(train_set)
+        scheduler.step()
+
+        # Validation Step
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
             for inputs, targets in val_loader:
-                with torch.amp.autocast(device_type='cuda'):
-                    player_deck = inputs[:, :121]
-                    opp_deck = inputs[:, 121:242]
+                with torch.amp.autocast(device_type=device.type, enabled=use_amp):
+                    player_deck = inputs[:, :HALF_INPUT_LEN]
+                    opp_deck = inputs[:, HALF_INPUT_LEN:]
                     preds = model(player_deck, opp_deck)
                     val_loss += criterion(preds, targets).item() * inputs.size(0)
-        val_loss /= len(val_loader.dataset)
 
-        print(f"Epoch {epoch}/{EPOCHS} — Train MSE: {train_loss:.6f}  Val MSE: {val_loss:.6f}")
+        val_loss /= len(val_set)
+
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"Epoch {epoch:03d}/{EPOCHS} — Train MSE: {train_loss:.6f} | Val MSE: {val_loss:.6f} | LR: {scheduler.get_last_lr()[0]:.6f}")
 
         if val_loss < best_val:
             best_val = val_loss
             torch.save(model.state_dict(), "value_net_best.pth")
-            print(" Saved best -> value_net_best.pth")
 
     torch.save(model.state_dict(), "value_net_final.pth")
-    print("Training done. final saved to value_net_final.pth")
-
+    print("Training finished! Final model saved to value_net_final.pth")
 
 
 if __name__ == "__main__":

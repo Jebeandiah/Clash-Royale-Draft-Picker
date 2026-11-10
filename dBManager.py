@@ -1,7 +1,7 @@
 import sqlite3
 import ast
 
-dbname = "testdb"
+DB_NAME = "testdb"
 def format_db(dbname):
     """Completely clear and recreate the battles table."""
     con = sqlite3.connect(f'{dbname}.db')
@@ -45,7 +45,7 @@ def format_db(dbname):
     con.close()
     print(f"✅ Database '{dbname}.db' has been reset and cleared.")
 
-def read_battles(dbname=dbname, limit=None):
+def read_battles(dbname=DB_NAME, limit=None):
     """
     Reads battles from the database.
     
@@ -84,7 +84,7 @@ def read_battles(dbname=dbname, limit=None):
 if __name__ == "__main__":
     # print(read_battles(dbname, 1)[0])
     format_db("testdb")
-    con = sqlite3.connect(f'{dbname}.db')
+    con = sqlite3.connect(f'{DB_NAME}.db')
     cursor = con.cursor()
     cursor.execute("DROP TABLE IF EXISTS training")
     
