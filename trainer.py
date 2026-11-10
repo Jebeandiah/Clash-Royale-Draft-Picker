@@ -25,7 +25,8 @@ def vectorize_deck(multi_hot):
         elixir_norm += (ch.card_list[card_id].elixir/5)/8 #5 is apprx max avg elxer used to normalize
         cat_counts_norm[ch.category_to_id[ch.card_list[card_id].categories[0]]] += 1.0/8
 
-    feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + cat_counts_norm, dtype=torch.float32)])
+    feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + cat_counts_norm,  dtype=torch.float32, device=multi_hot.device)])
+  
     return feature_vector
 
 
@@ -63,9 +64,9 @@ class read_training_dataset(Dataset):
             scores.append(score)
 
             # 3. Add Swapped Perspective (B vs A) for perfect symmetry
-            swapped_bits = torch.cat([combined_vector[HALF_INPUT_LEN:], combined_vector[:HALF_INPUT_LEN]])
-            inputs.append(swapped_bits)
-            scores.append(-score)
+            # swapped_bits = torch.cat([combined_vector[HALF_INPUT_LEN:], combined_vector[:HALF_INPUT_LEN]])
+            # inputs.append(swapped_bits)
+            # scores.append(-score)
 
         self.inputs = torch.stack(inputs).to(device)
         self.scores = torch.tensor(scores, dtype=torch.float32, device=device)
@@ -94,7 +95,22 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         return self.act(x + self.block(x))
 
+class SwappedPerspectives(Dataset):
+    def __init__(self, subset):
+        self.subset = subset
 
+    def __len__(self):
+        return 2 * len(self.subset)
+
+    def __getitem__(self, idx):
+        inputs, score = self.subset[idx // 2]
+
+        if idx % 2 == 0:
+            return inputs, score
+
+        player = inputs[:HALF_INPUT_LEN]
+        opponent = inputs[HALF_INPUT_LEN:]
+        return torch.cat([opponent, player]), -score
 class OptimizedDeckEncoder(nn.Module):
     """
     Shared Siamese Encoder:
@@ -175,6 +191,7 @@ def train():
     n_val = int(len(dataset) * VAL_SPLIT)
     n_train = len(dataset) - n_val
     train_set, val_set = random_split(dataset, [n_train, n_val])
+    train_set = SwappedPerspectives(train_set)
 
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
