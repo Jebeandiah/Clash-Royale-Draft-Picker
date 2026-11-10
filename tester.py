@@ -6,7 +6,7 @@ import random
 # Config
 # -----------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "value_net_best.pth"
+MODEL_PATH = "value_net_concat_win_best.pth"
 
 # -----------------------
 # Helper to convert a deck to bit vector
@@ -36,41 +36,42 @@ def score_matchup(deck1, deck2):
     vec1 = deck_to_tensor(deck1)  # [1, num_cards]
     vec2 = deck_to_tensor(deck2) # [1, num_cards]W
     with torch.no_grad():
-        score = model(trainer.vectorize_deck(vec1), trainer.vectorize_deck(vec2))
-    return score.item()
+        logit = model(trainer.vectorize_deck(vec1), trainer.vectorize_deck(vec2))
+        return torch.sigmoid(logit).item()
+    # return score.item()
 
 # -----------------------
 # Example usage
 # -----------------------
-# if __name__ == "__main__":
-#     matchups = [
-#     (
-#         "Splash and spells vs swarm",
-#         ["valkyrie", "wizard", "baby dragon", "bomber",
-#          "arrows", "mother witch", "hog rider", "cannon"],
-#         ["skeletons", "goblins", "skeleton army", "bats",
-#          "minion horde", "goblin gang", "miner", "goblin barrel"],
-#     ),
-#     (
-#         "Air-heavy deck vs almost no anti-air",
-#         ["balloon", "lava hound", "baby dragon", "mega minion",
-#          "minions", "bats", "arrows", "fireball"],
-#         ["knight", "valkyrie", "skeletons", "bomber",
-#          "skeleton army", "goblins", "the log", "golem"],
-#     ),
-#     (
-#         "Tank killers vs expensive ground tanks",
-#         ["p.e.k.k.a", "inferno tower", "mini p.e.k.k.a", "skeleton army",
-#          "musketeer", "zap", "fireball", "hog rider"],
-#         ["golem", "giant", "royal giant", "goblin giant",
-#          "electro giant", "elixir golem", "knight", "bomber"],
-#     ),
-# ]
+if __name__ == "__main__":
+    matchups = [
+    (
+        "Splash and spells vs swarm",
+        ["valkyrie", "wizard", "baby dragon", "bomber",
+         "arrows", "mother witch", "hog rider", "cannon"],
+        ["skeletons", "goblins", "skeleton army", "bats",
+         "minion horde", "goblin gang", "miner", "goblin barrel"],
+    ),
+    (
+        "Air-heavy deck vs almost no anti-air",
+        ["balloon", "lava hound", "baby dragon", "mega minion",
+         "minions", "tombstone", "arrows", "fireball"],
+        ["knight", "valkyrie", "mini p.e.k.k.a", "bomber",
+         "skeleton army", "goblins", "the log", "zap"],
+    ),
+    (
+        "Tank killers vs expensive ground tanks",
+        ["p.e.k.k.a", "inferno tower", "mini p.e.k.k.a", "skeleton army",
+         "musketeer", "zap", "fireball", "hog rider"],
+        ["golem", "giant", "royal giant", "goblin giant",
+         "electro giant", "elixir golem", "knight", "bomber"],
+    ),
+]
 
-#     for name, deck_a, deck_b in matchups:
-#         ab = score_matchup(deck_a, deck_b)
-#         ba = score_matchup(deck_b, deck_a)
-#         print(f"{name}: A vs B {ab:+.4f} | B vs A {ba:+.4f}")
+    for name, deck_a, deck_b in matchups:
+        ab = score_matchup(deck_a, deck_b)
+        ba = score_matchup(deck_b, deck_a)
+        print(f"{name}: A vs B {ab*100:.4f}% | B vs A {ba*100:.4f}%")
 
 
 def random_matchup(rng):
@@ -108,5 +109,5 @@ if __name__ == "__main__":
 
     print("Deck A:", ", ".join(deck_a))
     print("Deck B:", ", ".join(deck_b))
-    print(f"A vs B: {score_matchup(deck_a, deck_b):+.4f}")
-    print(f"B vs A: {score_matchup(deck_b, deck_a):+.4f}")
+    print(f"A vs B: {score_matchup(deck_a, deck_b)*100:.4f}%")
+    print(f"B vs A: {score_matchup(deck_b, deck_a)*100:.4f}%")

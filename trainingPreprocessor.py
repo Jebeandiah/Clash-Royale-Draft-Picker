@@ -26,7 +26,7 @@ def bitpack_tensor(t):
     packed = t.matmul(2 ** torch.arange(8, dtype=torch.uint8))
     return packed.numpy().tobytes()
 
-def collect_decks(dbname=dBManager.dbname, limit=None):
+def collect_decks(dbname=dBManager.DB_NAME, limit=None):
   
 
     con = sqlite3.connect(f'{dbname}.db')
@@ -73,7 +73,7 @@ def collect_decks(dbname=dBManager.dbname, limit=None):
     con.commit()
     con.close()
 
-def read_training_data(dbname=dBManager.dbname, limit=None):
+def read_training_data(dbname=dBManager.DB_NAME, limit=None):
     
     con = sqlite3.connect(f'{dbname}.db')
     cur = con.cursor()

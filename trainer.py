@@ -1,3 +1,5 @@
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,11 +8,13 @@ import sqlite3
 import dBManager
 import cardhelpers as ch
 
+MATCHUP_MODE = "concat"  # "concat" or "difference"
+TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
 HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.category_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
-BATCH_SIZE = 8192
+BATCH_SIZE = 512
 NUM_WORKERS = 0
 EPOCHS = 500
-LR = 1e-5
+LR = 3e-5
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
@@ -149,114 +153,161 @@ class OptimizedDeckEncoder(nn.Module):
 
 
 class OptimizedValueNet(nn.Module):
-    """
-    Matchup Rating Head:
-    Computes vector difference (h_a - h_b) to enforce mathematically perfect anti-symmetry.
-    """
-    def __init__(self, input_len=HALF_INPUT_LEN, embed_dim=64, dropout=DROPOUT):
+    def __init__(
+        self,
+        input_len=HALF_INPUT_LEN,
+        embed_dim=64,
+        dropout=DROPOUT,
+        matchup_mode=MATCHUP_MODE,
+        target_mode=TARGET_MODE,
+    ):
         super().__init__()
-        self.encoder = OptimizedDeckEncoder(input_len=input_len, embed_dim=embed_dim, dropout=dropout)
+        if matchup_mode not in ("concat", "difference"):
+            raise ValueError(f"Unknown matchup mode: {matchup_mode}")
+        if target_mode not in ("win", "health_diff"):
+            raise ValueError(f"Unknown target mode: {target_mode}")
 
-        # Takes 64-dim vector difference (h_a - h_b)
+        self.matchup_mode = matchup_mode
+        self.target_mode = target_mode
+        self.encoder = OptimizedDeckEncoder(
+            input_len=input_len, embed_dim=embed_dim, dropout=dropout
+        )
+
+        head_input = 2 * embed_dim if matchup_mode == "concat" else embed_dim
         self.classifier = nn.Sequential(
-            nn.Linear(embed_dim, 64),
+            nn.Linear(head_input, 64),
             nn.LayerNorm(64),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(64, 32),
             nn.GELU(),
             nn.Linear(32, 1),
-            nn.Tanh()
         )
 
     def forward(self, player_deck, opp_deck):
-        # Pass both decks through identical shared encoder weights
         h_a = self.encoder(player_deck)
         h_b = self.encoder(opp_deck)
 
-        # Vector difference guarantees model(A, B) == -model(B, A)
-        diff = h_a - h_b
-        return (0.5 * (self.classifier(diff) - self.classifier(-diff))).squeeze(-1)
+        if self.matchup_mode == "concat":
+            ab = torch.cat([h_a, h_b], dim=-1)
+            ba = torch.cat([h_b, h_a], dim=-1)
+        else:
+            ab = h_a - h_b
+            ba = -ab
+
+        score = 0.5 * (self.classifier(ab) - self.classifier(ba))
+        score = score.squeeze(-1)
+        return score.tanh() if self.target_mode == "health_diff" else score
 
 
-# -----------------------
-# Training Loop
-# -----------------------
-def train():
-    device = torch.device(DEVICE)
-    print("Training Device:", device)
+def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None):
+    training = optimizer is not None
+    model.train(training)
+    loss_total = 0.0
+    loss_count = 0
+    correct = 0
+    nonzero_count = 0
 
-    dataset = read_training_dataset(db_name=dBManager.DB_NAME, device=device)
+    with torch.set_grad_enabled(training):
+        for inputs, targets in loader:
+            if model.target_mode == "win":
+                keep = targets != 0
+                inputs, targets = inputs[keep], targets[keep]
+                if targets.numel() == 0:
+                    continue
+                labels = (targets > 0).float()
+            else:
+                labels = targets
 
-    n_val = int(len(dataset) * VAL_SPLIT)
-    n_train = len(dataset) - n_val
-    train_set, val_set = random_split(dataset, [n_train, n_val])
-    train_set = SwappedPerspectives(train_set)
+            if training:
+                optimizer.zero_grad()
 
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
-
-    model = OptimizedValueNet(input_len=HALF_INPUT_LEN, dropout=DROPOUT).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
-    criterion = nn.MSELoss()
-    
-    # Cosine annealing learning rate scheduler for smooth convergence
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
-
-    use_amp = (device.type == "cuda")
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
-
-    best_val = float("inf")
-    
-    for epoch in range(1, EPOCHS + 1):
-        model.train()
-        train_loss = 0.0
-
-        for inputs, targets in train_loader:
-            optimizer.zero_grad()
-
-            with torch.amp.autocast(device_type=device.type, enabled=use_amp):
+            with torch.amp.autocast(
+                device_type=device.type, enabled=device.type == "cuda"
+            ):
                 player_deck = inputs[:, :HALF_INPUT_LEN]
                 opp_deck = inputs[:, HALF_INPUT_LEN:]
-                preds = model(player_deck, opp_deck)
-                loss = criterion(preds, targets)
+                predictions = model(player_deck, opp_deck)
+                loss = criterion(predictions, labels)
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            if training:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                nonzero = targets != 0
+                correct += (
+                    (predictions.sign() == targets.sign()) & nonzero
+                ).sum().item()
+                nonzero_count += nonzero.sum().item()
 
-            train_loss += loss.item() * inputs.size(0)
+            loss_total += loss.item() * targets.numel()
+            loss_count += targets.numel()
 
-        train_loss /= len(train_set)
+    if loss_count == 0:
+        split = "Training" if training else "Validation"
+        raise RuntimeError(f"{split} split has no usable targets.")
+
+    accuracy = correct / nonzero_count if nonzero_count else None
+    return loss_total / loss_count, accuracy
+
+
+def train():
+    device = torch.device(DEVICE)
+    print(f"Training on {device} | matchup={MATCHUP_MODE} | target={TARGET_MODE}")
+
+    dataset = read_training_dataset(db_name=dBManager.DB_NAME, device=device)
+    n_val = int(len(dataset) * VAL_SPLIT)
+    n_train = len(dataset) - n_val
+    train_set, val_set = random_split(
+        dataset,
+        [n_train, n_val]
+    )
+    train_loader = DataLoader(
+        SwappedPerspectives(train_set),
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=NUM_WORKERS,
+    )
+    val_loader = DataLoader(
+        val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS
+    )
+
+    model = OptimizedValueNet().to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=EPOCHS, eta_min=1e-6
+    )
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
+
+    if TARGET_MODE == "win":
+        criterion = nn.BCEWithLogitsLoss()
+        loss_name = "BCE"
+    else:
+        criterion = nn.MSELoss()
+        loss_name = "MSE"
+
+    checkpoint = f"value_net_{MATCHUP_MODE}_{TARGET_MODE}"
+    best_val = float("inf")
+
+    for epoch in range(1, EPOCHS + 1):
+        train_loss, _ = run_epoch(
+            model, train_loader, criterion, device, optimizer, scaler
+        )
+        val_loss, val_acc = run_epoch(model, val_loader, criterion, device)
         scheduler.step()
 
-        # Validation Step
-        model.eval()
-        val_loss = 0.0
-        val_correct = 0
-        val_nonzero = 0
-        with torch.no_grad():
-            for inputs, targets in val_loader:
-                with torch.amp.autocast(device_type=device.type, enabled=use_amp):
-                    player_deck = inputs[:, :HALF_INPUT_LEN]
-                    opp_deck = inputs[:, HALF_INPUT_LEN:]
-                    preds = model(player_deck, opp_deck)
-                    val_loss += criterion(preds, targets).item() * inputs.size(0)
-                    mask = targets != 0
-                    val_correct += ((preds.sign() == targets.sign()) & mask).sum().item()
-                    val_nonzero += mask.sum().item()
-
-        val_loss /= len(val_set)
-
-        if epoch % 1 == 0 or epoch == 1:
-            print(f"Epoch {epoch:03d}/{EPOCHS} — Train MSE: {train_loss:.6f} | Val MSE: {val_loss:.6f} | LR: {scheduler.get_last_lr()[0]:.6f} | Outcome prediction accuracy: {val_correct / val_nonzero:.2%}")
+        accuracy = f"{val_acc:.2%}" if val_acc is not None else "N/A"
+        print(
+            f"Epoch {epoch:03d}/{EPOCHS} | Train {loss_name}: {train_loss:.6f} "
+            f"| Val {loss_name}: {val_loss:.6f} | Val sign accuracy: {accuracy}"
+        )
 
         if val_loss < best_val:
             best_val = val_loss
-            torch.save(model.state_dict(), "value_net_best.pth")
+            torch.save(model.state_dict(), f"{checkpoint}_best.pth")
 
-    torch.save(model.state_dict(), "value_net_final.pth")
-    print("Training finished! Final model saved to value_net_final.pth")
+    torch.save(model.state_dict(), f"{checkpoint}_final.pth")
 
 
 if __name__ == "__main__":

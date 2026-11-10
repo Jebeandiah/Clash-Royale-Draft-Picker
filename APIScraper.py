@@ -38,7 +38,7 @@ MAX_CONCURRENT_REQUESTS = 8
 REQUESTS_PER_SECOND = 100
 DBNAME = dBManager.DB_NAME
 BATCH_COMMIT_SIZE = 25
-TOTAL_BATTLE_LIMIT = 100000
+TOTAL_BATTLE_LIMIT = 1000000
 MAX_PENDING_CLANS = 10_000
 
 # --- RATE LIMITER ---
@@ -236,18 +236,27 @@ async def crawl_from_top_clan():
 
     async with aiohttp.ClientSession() as session:
         # enqueue top clan
-        clans = await fetch_top_clans(session, 1)
+        clans = await fetch_top_clans(session, 10)
         if not clans:
             print("❌ Failed to fetch top clan")
             return
 
-        top_clan = clans[0]
         cur = con.cursor()
-        cur.execute("INSERT OR IGNORE INTO found_clans (tag, status) VALUES (?, 'pending')", (top_clan["tag"],))
+        cur.executemany(
+            "INSERT OR IGNORE INTO found_clans (tag, status) VALUES (?, 'pending')",
+            [(clan["tag"],) for clan in clans],
+        )
         con.commit()
-        pending_clans[0] = 1
-        queue.put_nowait(top_clan["tag"])
 
+        pending_tags = cur.execute(
+            "SELECT tag FROM found_clans WHERE status = 'pending'"
+        ).fetchall()
+
+        pending_clans[0] = len(pending_tags)
+        for (tag,) in pending_tags:
+            queue.put_nowait(tag)
+
+        print(f"Fetched {len(clans)} seed clans, {pending_clans[0]} pending in SQLite")
         # start workers
         tasks = [
             asyncio.create_task(worker(f"W{i+1}", session, rate_limiter, con, battle_counter,
