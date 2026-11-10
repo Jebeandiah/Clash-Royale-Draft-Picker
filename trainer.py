@@ -7,10 +7,10 @@ import dBManager
 import cardhelpers as ch
 
 HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.category_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
-BATCH_SIZE = 256
+BATCH_SIZE = 8192
 NUM_WORKERS = 0
 EPOCHS = 500
-LR = 1e-3
+LR = 1e-5
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
@@ -176,7 +176,7 @@ class OptimizedValueNet(nn.Module):
 
         # Vector difference guarantees model(A, B) == -model(B, A)
         diff = h_a - h_b
-        return self.classifier(diff).squeeze(-1)
+        return (0.5 * (self.classifier(diff) - self.classifier(-diff))).squeeze(-1)
 
 
 # -----------------------
@@ -233,6 +233,8 @@ def train():
         # Validation Step
         model.eval()
         val_loss = 0.0
+        val_correct = 0
+        val_nonzero = 0
         with torch.no_grad():
             for inputs, targets in val_loader:
                 with torch.amp.autocast(device_type=device.type, enabled=use_amp):
@@ -240,11 +242,14 @@ def train():
                     opp_deck = inputs[:, HALF_INPUT_LEN:]
                     preds = model(player_deck, opp_deck)
                     val_loss += criterion(preds, targets).item() * inputs.size(0)
+                    mask = targets != 0
+                    val_correct += ((preds.sign() == targets.sign()) & mask).sum().item()
+                    val_nonzero += mask.sum().item()
 
         val_loss /= len(val_set)
 
-        if epoch % 10 == 0 or epoch == 1:
-            print(f"Epoch {epoch:03d}/{EPOCHS} — Train MSE: {train_loss:.6f} | Val MSE: {val_loss:.6f} | LR: {scheduler.get_last_lr()[0]:.6f}")
+        if epoch % 1 == 0 or epoch == 1:
+            print(f"Epoch {epoch:03d}/{EPOCHS} — Train MSE: {train_loss:.6f} | Val MSE: {val_loss:.6f} | LR: {scheduler.get_last_lr()[0]:.6f} | Outcome prediction accuracy: {val_correct / val_nonzero:.2%}")
 
         if val_loss < best_val:
             best_val = val_loss
