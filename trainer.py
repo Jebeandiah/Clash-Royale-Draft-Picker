@@ -18,36 +18,62 @@ DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+def vectorize_deck(multi_hot):
+   
+    num_cards = len(ch.card_list)
+    card_ids = torch.nonzero(multi_hot).flatten().tolist()
+    # Unpack bits from bytes
+    
+    return torch.cat([multi_hot, ])
 
 class read_training_dataset(Dataset):
     
-    def __init__(self, db_name = dBManager.dbname, device=DEVICE):
+    def __init__(self, db_name=dBManager.dbname, device=DEVICE):
         con = sqlite3.connect(f'{db_name}.db')
         cur = con.cursor()
-        cur.execute("SELECT input, score FROM training")
+        cur.execute("SELECT packed_decks, low_tower_dif FROM battles")
         rows = cur.fetchall()
         con.close()
 
         if len(rows) == 0:
-            raise RuntimeError("No training rows found in DB training table.")
+            raise RuntimeError("No battle rows found in database.")
 
+        num_cards = len(ch.card_list)
         inputs, scores = [], []
 
-        for input_blob,  score in rows:
-            packed = torch.tensor(list(input_blob), dtype=torch.uint8)
+        for packed_blob, low_tower_dif in rows:
+            # 1. Unpack bits from bytes
+            packed = torch.tensor(list(packed_blob), dtype=torch.uint8)
             t = packed.view(-1, 1)
             bits = ((t & (1 << torch.arange(8))) > 0).to(torch.float32)
-            bits = torch.flip(bits, dims=[1]).flatten()
-            bits = bits[:len(ch.card_list)*2]
+            bits = torch.flip(bits, dims=[1]).flatten()[:num_cards * 2]
+
+            # 2. Slice out the two 120-dim multi-hot vectors (NO re-encoding needed!)
+            p_multi_hot = bits[:num_cards]
+            o_multi_hot = bits[num_cards:]
+            p_vector = vectorize_deck(p_multi_hot)
+            o_vector = vectorize_deck(o_multi_hot)
+
+            score = float(low_tower_dif) / 9156.0
+
+            # 2. Add Original Perspective (A vs B)
             inputs.append(bits)
             scores.append(score)
+
+            # 3. Add Swapped Perspective (B vs A) for perfect symmetry
+            swapped_bits = torch.cat([bits[num_cards:], bits[:num_cards]])
+            inputs.append(swapped_bits)
+            scores.append(-score)
+
         self.inputs = torch.stack(inputs).to(device)
         self.scores = torch.tensor(scores, dtype=torch.float32, device=device)
-    def __len__(self):
-        return self.inputs.size(0)
 
-    def __getitem__(self, idx):
-        return self.inputs[idx], self.scores[idx]
+        def __len__(self):
+            return self.inputs.size(0)
+
+        def __getitem__(self, idx):
+            return self.inputs[idx], self.scores[idx]
+
 class DeckEncoder(nn.Module):
     """Shared encoder that converts one deck vector into an embedding"""
     def __init__(self, input_len, hidden=512, embed_dim=64, dropout=0.1):

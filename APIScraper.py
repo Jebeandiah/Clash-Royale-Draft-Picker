@@ -4,8 +4,11 @@ import aiohttp
 import time
 from urllib.parse import quote
 import sqlite3
+
+import torch
 import dBManager
 import cardhelpers as ch
+from trainingPreprocessor import bitpack_tensor
 def load_env_file(filepath=".env"):
     try:
         with open(filepath, "r") as f:
@@ -97,6 +100,21 @@ def extract_battle_data(battle):
     tdeck = [ch.name_to_id[c["name"].lower()] for c in team.get("cards", [])]
     odeck = [ch.name_to_id[c["name"].lower()] for c in opp.get("cards", [])]
 
+    team = battle["team"][0]
+    opp = battle["opponent"][0]
+    tdeck = [ch.name_to_id[c["name"].lower()] for c in team.get("cards", [])]
+    odeck = [ch.name_to_id[c["name"].lower()] for c in opp.get("cards", [])]
+
+    # Build 1D bit vector for both decks: size = 2 * len(card_list)
+    num_cards = len(ch.card_list)
+    vec = torch.zeros(num_cards * 2, dtype=torch.uint8)
+    for card_id in tdeck:
+        vec[card_id] = 1
+    for card_id in odeck:
+        vec[card_id + num_cards] = 1
+
+    # Pack bits into bytes BLOB
+    packed_deck = bitpack_tensor(vec)
     winner = team if team["crowns"] > opp["crowns"] else opp
     tower_healths = (winner.get("princessTowersHitPoints") or []) + [winner.get("kingTowerHitPoints", 0)]
     low_tower = 0
@@ -109,7 +127,7 @@ def extract_battle_data(battle):
 
     tags = sorted([team["tag"], opp["tag"]])
     battle_id = f"{battle['battleTime']}_{tags[0]}_{tags[1]}"
-    return (battle_id, low_tower, str(tdeck), str(odeck)), opp.get("clan", {}).get("tag")
+    return (battle_id, low_tower, packed_deck), opp.get("clan", {}).get("tag")
 
 # --- WORKER ---
 async def worker(name, session, rate_limiter, con, battle_counter, counter_lock, queue, pending_clans, pending_lock):
@@ -183,7 +201,7 @@ async def worker(name, session, rate_limiter, con, battle_counter, counter_lock,
             # Commit battles in batches
             if batch_rows:
                 cur.executemany(
-                    "INSERT OR IGNORE INTO battles (battle_id, low_tower_dif, player_deck, opp_deck) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO battles (battle_id, low_tower_dif, packed_decks) VALUES (?, ?, ?)",
                     batch_rows
                 )
                 con.commit()

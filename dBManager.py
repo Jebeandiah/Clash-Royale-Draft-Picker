@@ -15,19 +15,18 @@ def format_db(dbname):
         CREATE TABLE battles (
             battle_id TEXT PRIMARY KEY,
             low_tower_dif INTEGER NOT NULL,
-            player_deck TEXT NOT NULL,
-            opp_deck TEXT NOT NULL
-        )
+            packed_decks BLOB NOT NULL        
+            )
     ''')
-    cursor.execute("DROP TABLE IF EXISTS training")
+    # cursor.execute("DROP TABLE IF EXISTS training")
     
-    # Create the new table
-    cursor.execute('''
-        CREATE TABLE training (
-            input BLOB NOT NULL,
-            score float NOT NULL
-        )
-    ''')
+    # # Create the new table
+    # cursor.execute('''
+    #     CREATE TABLE training (
+    #         input BLOB NOT NULL,
+    #         score float NOT NULL
+    #     )
+    # ''')
     cursor.execute("DROP TABLE IF EXISTS found_clans")
     
     # Create the new table
