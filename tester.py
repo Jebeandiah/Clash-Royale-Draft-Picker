@@ -6,7 +6,7 @@ import random
 # Config
 # -----------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MATCHUP_MODE = "difference"  # "concat" or "difference"
+MATCHUP_MODE = "concat"  # "concat" or "difference"
 TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
 # -----------------------
 # Helper to convert a deck to bit vector
@@ -69,7 +69,7 @@ if __name__ == "__main__":
         "Air-heavy deck vs almost no anti-air",
         ["balloon", "lava hound", "baby dragon", "mega minion",
          "minions", "tombstone", "arrows", "fireball"],
-        ["knight", "valkyrie", "inferno tower", "bomber",
+        ["knight", "valkyrie", "mini p.e.k.k.a", "bomber",
          "skeleton army", "goblins", "the log", "zap"],
     ),
     (
@@ -78,6 +78,48 @@ if __name__ == "__main__":
          "musketeer", "zap", "fireball", "hog rider"],
         ["golem", "giant", "royal giant", "goblin giant",
          "electro giant", "elixir golem", "knight", "bomber"],
+    ),
+    (
+        "A favored | Air pressure vs ground-only defense",
+        ["lava hound", "balloon", "mega minion", "baby dragon",
+         "tombstone", "guards", "arrows", "fireball"],
+        ["golem", "prince", "mini p.e.k.k.a", "valkyrie",
+         "bomber", "cannon", "goblins", "the log"],
+    ),
+    (
+        "A favored | Multiple splash answers vs swarm bait",
+        ["hog rider", "valkyrie", "baby dragon", "bomber",
+         "cannon", "arrows", "the log", "fireball"],
+        ["goblin barrel", "skeleton barrel", "skeleton army", "goblin gang",
+         "minion horde", "bats", "knight", "zap"],
+    ),
+    (
+        "A favored | Tank killers vs slow ground push",
+        ["p.e.k.k.a", "inferno tower", "musketeer", "guards",
+         "hog rider", "ice spirit", "fireball", "zap"],
+        ["golem", "witch", "night witch", "knight",
+         "baby dragon", "mega minion", "tornado", "arrows"],
+    ),
+    (
+        "Roughly even | Two Hog-style cycle decks",
+        ["hog rider", "musketeer", "cannon", "ice golem",
+         "skeletons", "ice spirit", "fireball", "the log"],
+        ["ram rider", "archers", "skeletons", "knight",
+         "goblins", "electro spirit", "poison", "barbarian barrel"],
+    ),
+    (
+        "Roughly even | Two Miner control decks",
+        ["miner", "wall breakers", "knight", "bats",
+         "bomb tower", "spear goblins", "poison", "the log"],
+        ["goblin drill", "goblin barrel", "valkyrie", "archers",
+         "cannon", "skeletons", "fireball", "barbarian barrel"],
+    ),
+    (
+        "Roughly even | Two ground beatdown decks",
+        ["giant", "prince", "dark prince", "mega minion",
+         "musketeer", "fireball", "zap", "guards"],
+        ["goblin giant", "mini p.e.k.k.a", "valkyrie", "minions",
+         "hunter", "poison", "arrows", "goblins"],
     ),
 ]
 

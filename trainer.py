@@ -11,7 +11,8 @@ import cardhelpers as ch
 MATCHUP_MODE = "concat"  # "concat" or "difference"
 TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
 HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.properties_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
-BATCH_SIZE = 512
+# HALF_INPUT_LEN = len(ch.card_list)# 1 for elixer, 1 for each category, multi hot for each deck
+BATCH_SIZE = 1024
 NUM_WORKERS = 0
 EPOCHS = 500
 LR = 1e-4
@@ -33,6 +34,7 @@ def vectorize_deck(multi_hot):
     feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + prop_counts_norm,  dtype=torch.float32, device=multi_hot.device)])
   
     return feature_vector
+    # return multi_hot.float()  # Return the multi-hot vector as a float tensor
 
 
 
@@ -176,13 +178,13 @@ class OptimizedValueNet(nn.Module):
 
         head_input = 2 * embed_dim if matchup_mode == "concat" else embed_dim
         self.classifier = nn.Sequential(
-            nn.Linear(head_input, 64),
-            nn.LayerNorm(64),
+            nn.Linear(head_input, 128),
+            nn.LayerNorm(128),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(64, 32),
+            nn.Linear(128, 64),
             nn.GELU(),
-            nn.Linear(32, 1),
+            nn.Linear(64, 1),
         )
 
     def forward(self, player_deck, opp_deck):
