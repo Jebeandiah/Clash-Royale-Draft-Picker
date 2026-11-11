@@ -6,8 +6,8 @@ import random
 # Config
 # -----------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "value_net_concat_win_best.pth"
-
+MATCHUP_MODE = "difference"  # "concat" or "difference"
+TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
 # -----------------------
 # Helper to convert a deck to bit vector
 # -----------------------
@@ -21,12 +21,25 @@ def deck_to_tensor(deck):
         idx = ch.name_to_id[card.lower()]
         vec[idx] = 1.0  # your first 8-card deck
     return vec.flatten()
+def load_model():
+    matchup_mode = MATCHUP_MODE
+    target_mode = TARGET_MODE
+    path = f"value_net_{matchup_mode}_{target_mode}_best.pth"
 
-# -----------------------
-# Load model
-# -----------------------
-model = trainer.OptimizedValueNet().to(DEVICE)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+    model = trainer.OptimizedValueNet(
+        matchup_mode=matchup_mode,
+        target_mode=target_mode,
+    ).to(DEVICE)
+    model.load_state_dict(torch.load(path, map_location=DEVICE))
+    model.eval()
+    print(f"Loaded {path}")
+    return model
+
+
+model = load_model()
+
+
+model.load_state_dict(torch.load(f"value_net_{MATCHUP_MODE}_{TARGET_MODE}_best.pth", map_location=DEVICE))
 model.eval()
 
 # -----------------------
@@ -56,7 +69,7 @@ if __name__ == "__main__":
         "Air-heavy deck vs almost no anti-air",
         ["balloon", "lava hound", "baby dragon", "mega minion",
          "minions", "tombstone", "arrows", "fireball"],
-        ["knight", "valkyrie", "mini p.e.k.k.a", "bomber",
+        ["knight", "valkyrie", "inferno tower", "bomber",
          "skeleton army", "goblins", "the log", "zap"],
     ),
     (
