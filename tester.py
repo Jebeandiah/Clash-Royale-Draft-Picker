@@ -56,77 +56,74 @@ def score_matchup(deck1, deck2):
 # -----------------------
 # Example usage
 # -----------------------
-if __name__ == "__main__":
-    matchups = [
+
+matchups = [
     (
         "Splash and spells vs swarm",
         ["valkyrie", "wizard", "baby dragon", "bomber",
-         "arrows", "mother witch", "hog rider", "cannon"],
+            "arrows", "mother witch", "hog rider", "cannon"],
         ["skeletons", "goblins", "skeleton army", "bats",
-         "minion horde", "goblin gang", "miner", "goblin barrel"],
+            "minion horde", "goblin gang", "miner", "goblin barrel"],
     ),
     (
         "Air-heavy deck vs almost no anti-air",
         ["balloon", "lava hound", "baby dragon", "mega minion",
-         "minions", "tombstone", "arrows", "fireball"],
+            "minions", "tombstone", "arrows", "fireball"],
         ["knight", "valkyrie", "mini p.e.k.k.a", "bomber",
-         "skeleton army", "goblins", "the log", "zap"],
+            "skeleton army", "goblins", "the log", "zap"],
     ),
     (
         "Tank killers vs expensive ground tanks",
         ["p.e.k.k.a", "inferno tower", "mini p.e.k.k.a", "skeleton army",
-         "musketeer", "zap", "fireball", "hog rider"],
+            "musketeer", "zap", "fireball", "hog rider"],
         ["golem", "giant", "royal giant", "goblin giant",
-         "electro giant", "elixir golem", "knight", "bomber"],
+            "electro giant", "elixir golem", "knight", "bomber"],
     ),
     (
         "A favored | Air pressure vs ground-only defense",
         ["lava hound", "balloon", "mega minion", "baby dragon",
-         "tombstone", "guards", "arrows", "fireball"],
+            "tombstone", "guards", "arrows", "fireball"],
         ["golem", "prince", "mini p.e.k.k.a", "valkyrie",
-         "bomber", "cannon", "goblins", "the log"],
+            "bomber", "cannon", "goblins", "the log"],
     ),
     (
         "A favored | Multiple splash answers vs swarm bait",
         ["hog rider", "valkyrie", "baby dragon", "bomber",
-         "cannon", "arrows", "the log", "fireball"],
+            "cannon", "arrows", "the log", "fireball"],
         ["goblin barrel", "skeleton barrel", "skeleton army", "goblin gang",
-         "minion horde", "bats", "knight", "zap"],
+            "minion horde", "bats", "knight", "zap"],
     ),
     (
         "A favored | Tank killers vs slow ground push",
         ["p.e.k.k.a", "inferno tower", "musketeer", "guards",
-         "hog rider", "ice spirit", "fireball", "zap"],
-        ["golem", "witch", "night witch", "knight",
-         "baby dragon", "mega minion", "tornado", "arrows"],
+            "hog rider", "ice spirit", "fireball", "zap"],
+        ["golem", "giant", "bowler", "knight",
+            "baby dragon", "mega minion", "tornado", "arrows"],
     ),
     (
         "Roughly even | Two Hog-style cycle decks",
         ["hog rider", "musketeer", "cannon", "ice golem",
-         "skeletons", "ice spirit", "fireball", "the log"],
+            "skeletons", "ice spirit", "fireball", "the log"],
         ["ram rider", "archers", "skeletons", "knight",
-         "goblins", "electro spirit", "poison", "barbarian barrel"],
+            "goblins", "electro spirit", "poison", "barbarian barrel"],
     ),
     (
         "Roughly even | Two Miner control decks",
         ["miner", "wall breakers", "knight", "bats",
-         "bomb tower", "spear goblins", "poison", "the log"],
-        ["goblin drill", "goblin barrel", "valkyrie", "archers",
-         "cannon", "skeletons", "fireball", "barbarian barrel"],
+            "bomb tower", "spear goblins", "poison", "the log"],
+        ["miner", "goblin barrel", "valkyrie", "archers",
+            "cannon", "skeletons", "fireball", "barbarian barrel"],
     ),
     (
         "Roughly even | Two ground beatdown decks",
         ["giant", "prince", "dark prince", "mega minion",
-         "musketeer", "fireball", "zap", "guards"],
+            "musketeer", "fireball", "zap", "guards"],
         ["goblin giant", "mini p.e.k.k.a", "valkyrie", "minions",
-         "hunter", "poison", "arrows", "goblins"],
+            "hunter", "poison", "arrows", "goblins"],
     ),
 ]
 
-    for name, deck_a, deck_b in matchups:
-        ab = score_matchup(deck_a, deck_b)
-        ba = score_matchup(deck_b, deck_a)
-        print(f"{name}: A vs B {ab*100:.4f}% | B vs A {ba*100:.4f}%")
+
 
 
 def random_matchup(rng):
@@ -158,11 +155,32 @@ def random_matchup(rng):
     raise ValueError("Could not fill the draft pool with unique cards.")
 
 
-if __name__ == "__main__":
-    rng = random.Random()  # Use random.Random(42) for repeatable matchups.
-    deck_a, deck_b = random_matchup(rng)
+def manual_draft(unassisted =13):
+    pool = ch.generate_pool()
+    decks = [[], []]
+    for i in range(16):
+        player = ((i+1)//2)%2
+        print(f"Player {player}'s turn.")    
+        print(f" Pool: {', '.join(pool)}")
+        card = input("Pick a card: ").strip().lower()
+        while card not in pool:
+            card = input("Pick a card: ").strip().lower()
 
-    print("Deck A:", ", ".join(deck_a))
-    print("Deck B:", ", ".join(deck_b))
-    print(f"A vs B: {score_matchup(deck_a, deck_b)*100:.4f}%")
-    print(f"B vs A: {score_matchup(deck_b, deck_a)*100:.4f}%")
+        decks[player].append(card)
+        pool.remove(card)
+        # print(player) 
+
+
+if __name__ == "__main__":
+    manual_draft()
+    # for name, deck_a, deck_b in matchups:
+    #     ab = score_matchup(deck_a, deck_b)
+    #     ba = score_matchup(deck_b, deck_a)
+    #     print(f"{name}: A vs B {ab*100:.4f}% | B vs A {ba*100:.4f}%")
+    # rng = random.Random()  # Use random.Random(42) for repeatable matchups.
+    # deck_a, deck_b = random_matchup(rng)
+
+    # print("Deck A:", ", ".join(deck_a))
+    # print("Deck B:", ", ".join(deck_b))
+    # print(f"A vs B: {score_matchup(deck_a, deck_b)*100:.4f}%")
+    # print(f"B vs A: {score_matchup(deck_b, deck_a)*100:.4f}%")

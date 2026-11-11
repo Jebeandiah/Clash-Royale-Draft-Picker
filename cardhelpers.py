@@ -1,5 +1,8 @@
 
 
+import random
+
+
 class Card:
      def __init__(self, name, categories, elixir, properties=[]):
         self.name = name
@@ -10,10 +13,13 @@ class Card:
 
      def __str__(self):
         
-        print_string = f"Card({self.name}, {self.categories}, {self.elixir})"
-
+        # print_string = f"Card({self.name}, {self.categories}, {self.elixir})"
+        print_string = f"{self.name}"
         return print_string
-     
+
+     def __repr__(self):
+        return self.__str__()
+
 card_list=[
 Card("ronin", ['anti_tank', 'mini_tank'], 5, ['dps', 'tank']),
 Card("royal delivery", ['damage_spell'], 3, ['small_spell', 'splash', 'distraction']),
@@ -114,7 +120,7 @@ Card("earthquake", ['damage_spell', 'second_spell'], 3, ['small_spell', 't_build
 Card("dark prince", ['mini_tank'], 4, ['tank', 'splash', 'aggro']),
 Card("baby dragon", ['anti_air'], 4, ['t_air', 'splash', 'air']),
 Card("electro giant", ['tank'], 7, ['tank', 'splash']),
-Card("lava hound", ['tank'], 7, ['tank', 'air']),
+Card("lava hound", ['tank'], 7, ['tank', 'air', 'swarm', 't_building']),
 Card("barbarians", ['anti_tank'], 5, ['dps',  'swarm']),
 Card("rocket", ['damage_spell', 'second_spell'], 6, ['big_spell']),
 Card("goblin gang", ['distraction'], 3, ['distraction', 'swarm', 'dps']),
@@ -165,6 +171,15 @@ for card in card_list:
         if category not in categorized_cards:
             categorized_cards[category] = []
         categorized_cards[category]+=[card]
+def generate_pool():
+    pool = set()
+    for category, total in category_totals.items():
+        for i in range(total):
+            test_choice = random.choice(categorized_cards[category]).name
+            while test_choice in pool:
+                test_choice = random.choice(categorized_cards[category]).name
+            pool.add(test_choice)
+    return pool
 # property_to_id = {}
 # for card, category in enumerate(categorized_cards):
 #     property_to_id[category] = i

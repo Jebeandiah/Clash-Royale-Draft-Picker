@@ -12,7 +12,7 @@ MATCHUP_MODE = "concat"  # "concat" or "difference"
 TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
 HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.properties_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
 # HALF_INPUT_LEN = len(ch.card_list)# 1 for elixer, 1 for each category, multi hot for each deck
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 NUM_WORKERS = 0
 EPOCHS = 500
 LR = 1e-4
@@ -291,7 +291,7 @@ def train():
         loss_name = "MSE"
 
     checkpoint = f"value_net_{MATCHUP_MODE}_{TARGET_MODE}"
-    best_val = float("inf")
+    best_val_acc = 0.0
 
     for epoch in range(1, EPOCHS + 1):
         train_loss, _ = run_epoch(
@@ -306,9 +306,10 @@ def train():
             f"| Val {loss_name}: {val_loss:.6f} | Val sign accuracy: {accuracy}"
         )
 
-        if val_loss < best_val:
-            best_val = val_loss
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
             torch.save(model.state_dict(), f"{checkpoint}_best.pth")
+            print(f"^ checkpoint ^")
 
     torch.save(model.state_dict(), f"{checkpoint}_final.pth")
 
