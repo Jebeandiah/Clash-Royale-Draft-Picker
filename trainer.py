@@ -10,11 +10,11 @@ import cardhelpers as ch
 
 MATCHUP_MODE = "concat"  # "concat" or "difference"
 TARGET_MODE = "win"      # "win" (BCE) or "health_diff" (MSE)
-HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.category_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
+HALF_INPUT_LEN = len(ch.card_list)+1+len(ch.properties_to_id) # 1 for elixer, 1 for each category, multi hot for each deck
 BATCH_SIZE = 512
 NUM_WORKERS = 0
 EPOCHS = 500
-LR = 3e-5
+LR = 1e-4
 DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
@@ -23,13 +23,14 @@ def vectorize_deck(multi_hot):
    
     num_cards = len(ch.card_list)
     card_ids = torch.nonzero(multi_hot).flatten().tolist()
-    cat_counts_norm = [0.0] * len(ch.category_to_id)
+    prop_counts_norm = [0.0] * len(ch.properties_to_id)
     elixir_norm =0
     for card_id in card_ids:
         elixir_norm += (ch.card_list[card_id].elixir/5)/8 #5 is apprx max avg elxer used to normalize
-        cat_counts_norm[ch.category_to_id[ch.card_list[card_id].categories[0]]] += 1.0/8
+        for property in ch.card_list[card_id].properties:
+            prop_counts_norm[ch.properties_to_id[property]] += 1.0/8
 
-    feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + cat_counts_norm,  dtype=torch.float32, device=multi_hot.device)])
+    feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + prop_counts_norm,  dtype=torch.float32, device=multi_hot.device)])
   
     return feature_vector
 
