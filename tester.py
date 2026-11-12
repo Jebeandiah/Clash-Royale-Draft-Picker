@@ -163,9 +163,7 @@ def best_choice(pool, multi_hot_decks, turn, player):
     if(turn==15):
         num_turns =1
     b_choice =[]
-    b_wr = 1
-    if(turn_player==player):
-        b_wr=0
+    b_wr = 0
     temp_choice =[]
     temp_wr = 0
     choices =list(combinations(pool, num_turns))
@@ -177,17 +175,15 @@ def best_choice(pool, multi_hot_decks, turn, player):
             sub_pool.remove(card)
             sub_decks[turn_player][ch.name_to_id[card]] =1.0
         if(turn==15):
-            temp_wr = score_matchup_tensors(sub_decks[player], sub_decks[1-player])  #base case
+            temp_wr = score_matchup_tensors(sub_decks[turn_player], sub_decks[1-turn_player])  #base case
         else:
-            temp_choice, temp_wr =best_choice(sub_pool, sub_decks, turn+num_turns, player)
-        if(turn_player==player):
-            if(temp_wr>b_wr):
-                b_wr = temp_wr
-                b_choice= choice
-        else:
-            if(temp_wr<b_wr):
-                b_wr = temp_wr
-                b_choice= choice
+            temp_choice, temp_wr =best_choice(sub_pool, sub_decks, turn+num_turns, turn_player)
+        
+        if(temp_wr>b_wr):
+            b_wr = temp_wr
+            b_choice= choice
+    if(turn_player!=player):
+        b_wr=1-b_wr   
     return b_choice, b_wr
 
 
@@ -206,10 +202,10 @@ def manual_draft(random_turns= 13, unassisted_turns=0):
         print(f"Player {0}'s deck: {', '.join(decks[0])}")    
         print(f"Player {1}'s deck: {', '.join(decks[1])}")  
         print(f"Player {turn_player}'s turn.") 
-        if(turn>=(unassisted_turns+random_turns) or (card not in choice)):
+        if(turn>=(unassisted_turns+random_turns) and ((card not in choice) or (turn%2==1))):
             print("Determining best choice...")
             choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn, turn_player)
-            print(f"Recommended card/s are {', '.join(choice)} with a worst-case winrate of {wr*100}%")
+            print(f"Recommended card/s are {', '.join(choice)} with a best worst-case winrate of {wr*100}%")
         card = input("Pick a card: ").strip().lower()
         while card not in pool:
             card = input("Invalid input, pick a card: ").strip().lower()
@@ -220,6 +216,7 @@ def manual_draft(random_turns= 13, unassisted_turns=0):
 
         print(f"Player {0}'s deck: {', '.join(decks[0])}")    
         print(f"Player {1}'s deck: {', '.join(decks[1])}")  
+        print(f"Player 0 has an expected winrate of: {score_matchup(decks[0], decks[1])}%")
         # print(player) 
 
 
