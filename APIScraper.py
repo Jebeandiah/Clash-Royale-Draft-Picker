@@ -8,7 +8,27 @@ import sqlite3
 import torch
 import dBManager
 import cardhelpers as ch
-from trainingPreprocessor import bitpack_tensor
+def bitpack_tensor(t):
+    """
+    Safely pack a 1D uint8 tensor of 0/1 bits into bytes.
+    Works for any length.
+    """
+    t = t.flatten().to(torch.uint8)
+    n = t.numel()
+    if n == 0:
+        return b""
+
+    # Pad to multiple of 8
+    pad = (8 - n % 8) % 8
+    if pad > 0:
+        t = torch.cat([t, torch.zeros(pad, dtype=torch.uint8)])
+
+    # Reshape to bytes
+    t = t.view(-1, 8)
+    # Reverse bits in each byte safely
+    t = torch.flip(t, dims=[1])
+    packed = t.matmul(2 ** torch.arange(8, dtype=torch.uint8))
+    return packed.numpy().tobytes()
 def load_env_file(filepath=".env"):
     try:
         with open(filepath, "r") as f:

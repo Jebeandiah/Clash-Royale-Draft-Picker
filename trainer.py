@@ -20,6 +20,19 @@ DROPOUT = 0.25
 VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+def blob_to_tensor (packed_blob):
+    num_cards = len(ch.card_list)
+
+    packed = torch.tensor(list(packed_blob), dtype=torch.uint8)
+    t = packed.view(-1, 1)
+    bits = ((t & (1 << torch.arange(8))) > 0).to(torch.float32)
+    bits = torch.flip(bits, dims=[1]).flatten()[:num_cards * 2]
+    # 2. Slice out the two 120-dim multi-hot vectors (NO re-encoding needed!)
+    p_multi_hot = bits[:num_cards]
+    o_multi_hot = bits[num_cards:]
+    return p_multi_hot, o_multi_hot
+
 def vectorize_deck(multi_hot):
    
     num_cards = len(ch.card_list)
@@ -34,10 +47,6 @@ def vectorize_deck(multi_hot):
     feature_vector = torch.cat([multi_hot, torch.tensor([elixir_norm] + prop_counts_norm,  dtype=torch.float32, device=multi_hot.device)])
   
     return feature_vector
-    # return multi_hot.float()  # Return the multi-hot vector as a float tensor
-
-
-
 class read_training_dataset(Dataset):
     
     def __init__(self, db_name=dBManager.DB_NAME, device=DEVICE):
@@ -61,8 +70,7 @@ class read_training_dataset(Dataset):
             bits = torch.flip(bits, dims=[1]).flatten()[:num_cards * 2]
 
             # 2. Slice out the two 120-dim multi-hot vectors (NO re-encoding needed!)
-            p_multi_hot = bits[:num_cards]
-            o_multi_hot = bits[num_cards:]
+            p_multi_hot, o_multi_hot = blob_to_tensor(packed_blob)
             p_vector = vectorize_deck(p_multi_hot)
             o_vector = vectorize_deck(o_multi_hot)
             combined_vector = torch.cat([p_vector, o_vector])
