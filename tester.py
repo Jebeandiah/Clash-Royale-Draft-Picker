@@ -191,7 +191,7 @@ def best_choice(pool, multi_hot_decks, turn, player):
     return b_choice, b_wr
 
 
-def manual_draft(random_turns= 12, unassisted_turns =1):
+def manual_draft(random_turns= 13, unassisted_turns=0):
     pool = ch.generate_pool()
     decks = [[], []]
     for i in range(2):
@@ -205,7 +205,8 @@ def manual_draft(random_turns= 12, unassisted_turns =1):
         print(f"Player {0}'s deck: {', '.join(decks[0])}")    
         print(f"Player {1}'s deck: {', '.join(decks[1])}")  
         print(f"Player {turn_player}'s turn.") 
-        if(turn>=unassisted_turns+random_turns and turn%2==1):
+        if(turn>=(unassisted_turns+random_turns) and (turn%2==1 or turn==random_turns+unassisted_turns)):
+            print("Determining best choice...")
             choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn, turn_player)
             print(f"Recommended card/s are {', '.join(choice)} with a worst-case winrate of {wr*100}%")
         card = input("Pick a card: ").strip().lower()
