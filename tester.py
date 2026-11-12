@@ -198,14 +198,15 @@ def manual_draft(random_turns= 13, unassisted_turns=0):
         decks[i] = random.sample(list(pool), math.floor((random_turns-1-2*i)/4)+math.floor((random_turns-2*i)/4)+1+i);
         for card in decks[i]:
             pool.remove(card)
-
+    choice =[]
+    card =""
     for turn in range(random_turns, 16):
         turn_player = ((turn+1)//2)%2   
         print(f" Pool: {', '.join(pool)}")
         print(f"Player {0}'s deck: {', '.join(decks[0])}")    
         print(f"Player {1}'s deck: {', '.join(decks[1])}")  
         print(f"Player {turn_player}'s turn.") 
-        if(turn>=(unassisted_turns+random_turns) and (turn%2==1 or turn==random_turns+unassisted_turns)):
+        if(turn>=(unassisted_turns+random_turns) or (card not in choice)):
             print("Determining best choice...")
             choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn, turn_player)
             print(f"Recommended card/s are {', '.join(choice)} with a worst-case winrate of {wr*100}%")
