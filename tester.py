@@ -1,6 +1,8 @@
 import torch
 import cardhelpers as ch
 import trainer  # or wherever your ValueNet class is
+from itertools import combinations
+import math
 import random
 # -----------------------
 # Config
@@ -48,11 +50,12 @@ model.eval()
 def score_matchup(deck1, deck2):
     vec1 = deck_to_tensor(deck1)  # [1, num_cards]
     vec2 = deck_to_tensor(deck2) # [1, num_cards]W
-    with torch.no_grad():
-        logit = model(trainer.vectorize_deck(vec1), trainer.vectorize_deck(vec2))
-        return torch.sigmoid(logit).item()
+    return score_matchup_tensors(vec1, vec2)
     # return score.item()
-
+def score_matchup_tensors(deck1, deck2):
+    with torch.no_grad():
+        logit = model(trainer.vectorize_deck(deck1), trainer.vectorize_deck(deck2))
+        return torch.sigmoid(logit).item()
 # -----------------------
 # Example usage
 # -----------------------
@@ -154,20 +157,67 @@ def random_matchup(rng):
 
     raise ValueError("Could not fill the draft pool with unique cards.")
 
+def best_choice(pool, multi_hot_decks, turn, player):
+    turn_player = ((turn+1)//2)%2   
+    num_turns = turn%2+1
+    if(turn==15):
+        num_turns =1
+    b_choice =[]
+    b_wr = 1
+    if(turn_player==player):
+        b_wr=0
+    temp_choice =[]
+    temp_wr = 0
+    choices =list(combinations(pool, num_turns))
+    for choice in choices:
+        sub_pool= pool.copy()
+        sub_decks= multi_hot_decks.copy()
+        sub_decks[turn_player] = multi_hot_decks[turn_player].clone()
+        for card in choice:
+            sub_pool.remove(card)
+            sub_decks[turn_player][ch.name_to_id[card]] =1.0
+        if(turn==15):
+            temp_wr = score_matchup_tensors(sub_decks[player], sub_decks[1-player])  #base case
+        else:
+            temp_choice, temp_wr =best_choice(sub_pool, sub_decks, turn+num_turns, player)
+        if(turn_player==player):
+            if(temp_wr>b_wr):
+                b_wr = temp_wr
+                b_choice= choice
+        else:
+            if(temp_wr<b_wr):
+                b_wr = temp_wr
+                b_choice= choice
+    return b_choice, b_wr
 
-def manual_draft(unassisted =13):
+
+def manual_draft(random_turns= 12, unassisted_turns =1):
     pool = ch.generate_pool()
     decks = [[], []]
-    for i in range(16):
-        player = ((i+1)//2)%2
-        print(f"Player {player}'s turn.")    
+    for i in range(2):
+        decks[i] = random.sample(list(pool), math.floor((random_turns-1-2*i)/4)+math.floor((random_turns-2*i)/4)+1+i);
+        for card in decks[i]:
+            pool.remove(card)
+
+    for turn in range(random_turns, 16):
+        turn_player = ((turn+1)//2)%2   
         print(f" Pool: {', '.join(pool)}")
+        print(f"Player {0}'s deck: {', '.join(decks[0])}")    
+        print(f"Player {1}'s deck: {', '.join(decks[1])}")  
+        print(f"Player {turn_player}'s turn.") 
+        if(turn>=unassisted_turns+random_turns and turn%2==1):
+            choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn, turn_player)
+            print(f"Recommended card/s are {', '.join(choice)} with a worst-case winrate of {wr*100}%")
         card = input("Pick a card: ").strip().lower()
         while card not in pool:
-            card = input("Pick a card: ").strip().lower()
+            card = input("Invalid input, pick a card: ").strip().lower()
 
-        decks[player].append(card)
+
+        decks[turn_player].append(card)
         pool.remove(card)
+
+        print(f"Player {0}'s deck: {', '.join(decks[0])}")    
+        print(f"Player {1}'s deck: {', '.join(decks[1])}")  
         # print(player) 
 
 
