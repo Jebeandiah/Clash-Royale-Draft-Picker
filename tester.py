@@ -157,7 +157,7 @@ def random_matchup(rng):
 
     raise ValueError("Could not fill the draft pool with unique cards.")
 
-def best_choice(pool, multi_hot_decks, turn, player):
+def best_choice(pool, multi_hot_decks, turn):
     turn_player = ((turn+1)//2)%2   
     num_turns = turn%2+1
     if(turn==15):
@@ -177,13 +177,14 @@ def best_choice(pool, multi_hot_decks, turn, player):
         if(turn==15):
             temp_wr = score_matchup_tensors(sub_decks[turn_player], sub_decks[1-turn_player])  #base case
         else:
-            temp_choice, temp_wr =best_choice(sub_pool, sub_decks, turn+num_turns, turn_player)
+            temp_choice, temp_wr =best_choice(sub_pool, sub_decks, turn+num_turns)
+            temp_wr =1-temp_wr
         
         if(temp_wr>b_wr):
             b_wr = temp_wr
             b_choice= choice
-    if(turn_player!=player):
-        b_wr=1-b_wr   
+    # if(turn_player!=player):
+    #     b_wr=1-b_wr   
     return b_choice, b_wr
 
 
@@ -204,8 +205,8 @@ def manual_draft(random_turns= 13, unassisted_turns=0):
         print(f"Player {turn_player}'s turn.") 
         if(turn>=(unassisted_turns+random_turns) and ((card not in choice) or (turn%2==1))):
             print("Determining best choice...")
-            choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn, turn_player)
-            print(f"Recommended card/s are {', '.join(choice)} with a best worst-case winrate of {wr*100}%")
+            choice, wr = best_choice(pool, [deck_to_tensor(decks[0]),deck_to_tensor(decks[1])], turn)
+            print(f"Recommended card/s are {', '.join(choice)} with a best worst-case winrate of {(wr)*100}%")
         card = input("Pick a card: ").strip().lower()
         while card not in pool:
             card = input("Invalid input, pick a card: ").strip().lower()
