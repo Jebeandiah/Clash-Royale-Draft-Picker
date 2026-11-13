@@ -214,9 +214,9 @@ def manual_draft(random_turns= 13, unassisted_turns=0):
         decks[turn_player].append(card)
         pool.remove(card)
 
-        print(f"Player {0}'s deck: {', '.join(decks[0])}")    
-        print(f"Player {1}'s deck: {', '.join(decks[1])}")  
-        print(f"Player 0 has an expected winrate of: {score_matchup(decks[0], decks[1])}%")
+    print(f"Player {0}'s deck: {', '.join(decks[0])}")    
+    print(f"Player {1}'s deck: {', '.join(decks[1])}")  
+    print(f"Player 0 has an expected winrate of: {score_matchup(decks[0], decks[1])*100}%")
         # print(player) 
 
 
