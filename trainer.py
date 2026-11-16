@@ -21,6 +21,9 @@ VAL_SPLIT = 0.1
 SCALE = 10000.0  # rough scale for score
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+excluded_cards ={}
+
+
 def blob_to_tensor (packed_blob):
     num_cards = len(ch.card_list)
 
